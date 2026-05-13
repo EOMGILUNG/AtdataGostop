@@ -1,0 +1,1907 @@
+:root {
+  color-scheme: dark;
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --felt-deep: #04150c;
+  --felt-mid: #0b3221;
+  --felt-light: #1c5a3a;
+  --felt-edge: #02100a;
+  --lacquer: #1a0e07;
+  --gold: #c8a24b;
+  --gold-bright: #ffd87a;
+  --gold-soft: rgba(200, 162, 75, 0.32);
+  --gold-glow: rgba(255, 216, 122, 0.55);
+  --match-red: #ff5252;
+  --bomb-red: #e63838;
+  --text-main: #f3f7ef;
+  --text-dim: #cbd8ce;
+  --text-mute: #8ea197;
+  --panel-bg: rgba(6, 24, 16, 0.78);
+  --panel-bg-soft: rgba(0, 0, 0, 0.32);
+  --panel-border: rgba(200, 162, 75, 0.28);
+  --panel-inner: rgba(255, 255, 255, 0.04);
+  background: var(--felt-edge);
+  color: var(--text-main);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* iOS / Android touch tuning. Apply once globally so every tap target on the
+   page (cards, buttons, modal options) feels native on mobile. */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button,
+.hand-card,
+.start-button,
+.start-button-mini,
+.field-cell,
+.card-img,
+.bonus-card,
+.match-prompt-option {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+img,
+.card-img,
+.bonus-card {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;        /* fallback for older browsers */
+  min-height: 100dvh;       /* modern: handles iOS Safari URL bar correctly */
+  overscroll-behavior: none; /* no pull-to-refresh while playing */
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(ellipse at 50% 38%, var(--felt-light) 0%, var(--felt-mid) 38%, var(--felt-deep) 78%, var(--felt-edge) 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 30%, transparent 38%, rgba(0, 0, 0, 0.55) 100%);
+  z-index: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.game-screen {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(118px, auto) 1fr minmax(240px, auto);
+  min-height: 100vh;        /* fallback */
+  min-height: 100dvh;
+  gap: 10px;
+  /* Respect iPhone notch / Android status-bar via safe-area-inset. */
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  z-index: 1;
+}
+
+.start-screen {
+  position: relative;
+  display: block;
+  z-index: 1;
+}
+
+.opponent-zone,
+.player-zone,
+.table-zone {
+  position: relative;
+  border-radius: 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-inner),
+    inset 0 0 22px rgba(0, 0, 0, 0.35),
+    0 6px 20px rgba(0, 0, 0, 0.32);
+}
+
+.opponent-zone {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 12px 14px;
+}
+
+.table-zone {
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) minmax(0, 1fr) minmax(170px, 220px);
+  gap: 12px;
+  padding: 12px;
+  min-height: 380px;
+}
+
+.player-zone {
+  padding: 12px 14px 14px;
+}
+
+/* ----- Summary cards (opponent & player) ----- */
+
+.summary {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--gold), #6b4d18);
+  color: #1a0e07;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid rgba(255, 216, 122, 0.6);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  flex: 0 0 auto;
+}
+
+.summary-header .name {
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.summary-header .points {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary.cpu .summary-header .points {
+  font-size: 22px;
+}
+
+.summary-header .threshold {
+  font-size: 12px;
+  color: var(--text-mute);
+}
+
+.summary-header .modifiers {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.modifier-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(200, 162, 75, 0.16);
+  color: var(--gold-bright);
+  border: 1px solid rgba(200, 162, 75, 0.4);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.score-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.score-progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  transition: width 280ms ease;
+  border-radius: 3px;
+}
+
+.score-progress.full > span {
+  background: linear-gradient(90deg, #ff8a4d, #ffe08a);
+}
+
+/* ----- Metric chips (광/띠/열/피) ----- */
+
+.score-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.metric {
+  background: var(--panel-bg-soft);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.metric .metric-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.metric .metric-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric.metric-gwang.scoring .metric-value,
+.metric.metric-yeol.scoring .metric-value,
+.metric.metric-tti.scoring .metric-value,
+.metric.metric-pi.scoring .metric-value {
+  color: var(--gold-bright);
+}
+
+.metric.scoring {
+  border-color: var(--gold-soft);
+  background: rgba(200, 162, 75, 0.1);
+}
+
+/* ----- Yaku badges row ----- */
+
+.yaku-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.yaku-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-mute);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.yaku-badge.active {
+  background: linear-gradient(180deg, rgba(255, 216, 122, 0.96), rgba(200, 162, 75, 0.92));
+  color: #1a0e07;
+  border-color: rgba(255, 216, 122, 0.95);
+  box-shadow: 0 0 10px rgba(255, 216, 122, 0.45);
+}
+
+.yaku-badge .yaku-pts {
+  font-weight: 800;
+}
+
+/* ----- Captured cards strip ----- */
+
+.captured-groups {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(80px, 1fr));
+  gap: 6px;
+}
+
+.captured-group {
+  min-height: 64px;
+  padding: 6px 6px 4px;
+  border-radius: 8px;
+  background: var(--panel-bg-soft);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.captured-group b {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+  color: var(--gold-bright);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.captured-group b em {
+  font-style: normal;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.captured-group .cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+/* ----- Hidden hand (opponent) ----- */
+
+.hidden-hand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 54px;
+}
+
+.hidden-hand .card-back {
+  width: 38px;
+  height: 58px;
+  border-radius: 5px;
+  margin-left: -20px;
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hidden-hand .card-back:first-child {
+  margin-left: 0;
+}
+
+/* ----- Event log / status panel ----- */
+
+.event-log,
+.status-panel {
+  overflow: hidden;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(200, 162, 75, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.event-log h2,
+.status-panel h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--gold-bright);
+  text-transform: uppercase;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(200, 162, 75, 0.22);
+  padding-bottom: 6px;
+}
+
+.event-log p {
+  margin: 0 0 6px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding-left: 10px;
+  position: relative;
+}
+
+.event-log p::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gold);
+  opacity: 0.6;
+}
+
+.event-log p:first-child {
+  color: var(--text-main);
+}
+
+.event-log p:first-child::before {
+  background: var(--gold-bright);
+  opacity: 1;
+  box-shadow: 0 0 6px var(--gold-glow);
+}
+
+.status-panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.status-panel dt {
+  color: var(--text-mute);
+}
+
+.status-panel dd {
+  margin: 0;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-panel .hint {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(200, 162, 75, 0.12);
+  border: 1px solid var(--gold-soft);
+  color: var(--gold-bright);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ----- Field zone ----- */
+
+.field-zone {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+  min-height: 0;
+  padding: 4px;
+}
+
+.event-toast-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  z-index: 18;
+}
+
+.event-toast {
+  padding: 14px 36px;
+  border-radius: 16px;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 24px currentColor;
+  animation: toast-pop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.event-actor {
+  display: block;
+  font-size: 17px;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 6px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.event-toast.jjok {
+  color: #5cd9ff;
+  background: rgba(0, 162, 220, 0.18);
+  border: 2px solid rgba(92, 217, 255, 0.7);
+  box-shadow: 0 0 32px rgba(92, 217, 255, 0.45), inset 0 0 24px rgba(92, 217, 255, 0.15);
+}
+
+.event-toast.ttadak {
+  color: #ffa55c;
+  background: rgba(255, 165, 92, 0.18);
+  border: 2px solid rgba(255, 165, 92, 0.7);
+  box-shadow: 0 0 32px rgba(255, 165, 92, 0.45);
+}
+
+.event-toast.ppeok {
+  color: #ff7676;
+  background: rgba(255, 82, 82, 0.18);
+  border: 2px solid rgba(255, 118, 118, 0.7);
+  box-shadow: 0 0 32px rgba(255, 82, 82, 0.5), inset 0 0 24px rgba(255, 82, 82, 0.18);
+}
+
+.event-toast.ppeok-clear,
+.event-toast.quad {
+  color: #ff7676;
+  background: rgba(255, 82, 82, 0.18);
+  border: 2px solid rgba(255, 216, 122, 0.85);
+  box-shadow: 0 0 36px rgba(255, 216, 122, 0.5), inset 0 0 24px rgba(255, 82, 82, 0.18);
+}
+
+.event-toast.sweep {
+  color: var(--gold-bright);
+  background: rgba(255, 216, 122, 0.18);
+  border: 2px solid var(--gold-bright);
+  box-shadow: 0 0 36px var(--gold-glow), inset 0 0 24px rgba(255, 216, 122, 0.18);
+}
+
+.event-toast.bomb {
+  color: #ff9a4d;
+  background: rgba(255, 123, 58, 0.22);
+  border: 2px solid #ff9a4d;
+  box-shadow: 0 0 36px rgba(255, 123, 58, 0.6);
+  animation: toast-shake 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.event-toast.bonus {
+  color: #ffe08a;
+  background: linear-gradient(180deg, rgba(255, 216, 122, 0.28), rgba(184, 30, 43, 0.22));
+  border: 2px solid var(--gold-bright);
+  box-shadow:
+    0 0 40px var(--gold-glow),
+    0 0 80px rgba(255, 216, 122, 0.25),
+    inset 0 0 24px rgba(255, 216, 122, 0.3);
+  animation: toast-sparkle 1000ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes toast-pop {
+  0%   { opacity: 0; transform: scale(0.5) translateY(10px); }
+  18%  { opacity: 1; transform: scale(1.18) translateY(0); }
+  32%  { transform: scale(1) translateY(0); }
+  75%  { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(1.05) translateY(-14px); }
+}
+
+@keyframes toast-shake {
+  0%   { opacity: 0; transform: scale(0.5); }
+  15%  { opacity: 1; transform: scale(1.22) rotate(-2deg); }
+  25%  { transform: scale(1) rotate(1.5deg); }
+  35%  { transform: scale(1.02) rotate(-1deg); }
+  45%  { transform: scale(1) rotate(0.5deg); }
+  75%  { opacity: 1; transform: scale(1) rotate(0); }
+  100% { opacity: 0; transform: scale(1.06) translateY(-14px); }
+}
+
+@keyframes toast-sparkle {
+  0%   { opacity: 0; transform: scale(0.5) rotate(-4deg); }
+  18%  { opacity: 1; transform: scale(1.22) rotate(2deg); }
+  32%  { transform: scale(1) rotate(-1deg); }
+  50%  { transform: scale(1.03) rotate(1deg); }
+  78%  { opacity: 1; transform: scale(1) rotate(0); }
+  100% { opacity: 0; transform: scale(1.08) translateY(-14px); }
+}
+
+/* Steal-pi flight: a pi card flying from the loser's captured area to the
+   winner's captured area whenever the engine steals a pi (bonus, 쪽, 뻑풀기,
+   싹쓸이 등). Sits on top of the whole game screen. */
+
+.steal-flight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 16;
+  overflow: hidden;
+}
+
+.steal-flight {
+  position: absolute;
+  width: 56px;
+  height: 82px;
+  border-radius: 6px;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  left: 50%;
+  top: 0;
+}
+
+.steal-flight.is-bonus {
+  background: radial-gradient(ellipse at 50% 30%, #ffd17a 0%, #b81e2b 70%, #5a0d12 100%);
+  border-color: var(--gold-bright);
+}
+
+.steal-flight.to-player {
+  animation: steal-pi-to-player 900ms cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+
+.steal-flight.to-cpu {
+  animation: steal-pi-to-cpu 900ms cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+
+@keyframes steal-pi-to-player {
+  0%   {
+    top: 90px;
+    opacity: 0;
+    transform: translateX(-50%) rotate(-2deg) scale(0.85);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 216, 122, 0);
+  }
+  18%  {
+    top: 130px;
+    opacity: 1;
+    transform: translateX(-50%) rotate(-3deg) scale(1.08);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 24px 5px rgba(255, 216, 122, 0.6);
+  }
+  70%  {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 14px 3px rgba(255, 216, 122, 0.3);
+  }
+  100% {
+    top: calc(100% - 220px);
+    opacity: 0.45;
+    transform: translateX(-50%) rotate(-10deg) scale(0.78);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 216, 122, 0);
+  }
+}
+
+@keyframes steal-pi-to-cpu {
+  0%   {
+    top: calc(100% - 220px);
+    opacity: 0;
+    transform: translateX(-50%) rotate(2deg) scale(0.85);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 216, 122, 0);
+  }
+  18%  {
+    top: calc(100% - 260px);
+    opacity: 1;
+    transform: translateX(-50%) rotate(3deg) scale(1.08);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 24px 5px rgba(255, 216, 122, 0.6);
+  }
+  70%  {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 14px 3px rgba(255, 216, 122, 0.3);
+  }
+  100% {
+    top: 90px;
+    opacity: 0.45;
+    transform: translateX(-50%) rotate(10deg) scale(0.78);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 216, 122, 0);
+  }
+}
+
+.turn-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin: 0 auto;
+}
+
+.turn-banner.player {
+  color: var(--gold-bright);
+  background: linear-gradient(180deg, rgba(255, 216, 122, 0.16), rgba(200, 162, 75, 0.08));
+  border-color: rgba(255, 216, 122, 0.55);
+  box-shadow: 0 0 14px rgba(255, 216, 122, 0.18);
+}
+
+.turn-banner.cpu {
+  color: #e8c7b2;
+  border-color: rgba(232, 199, 178, 0.45);
+}
+
+.turn-banner .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.deck-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.deck-pile {
+  position: relative;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.deck-pile .card-back {
+  width: 60px;
+  height: 88px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 216, 122, 0.45);
+}
+
+.deck-pile strong {
+  position: absolute;
+  right: -10px;
+  bottom: -10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bomb-red);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.field-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(102px, auto));
+  justify-items: center;
+  align-content: start;
+  gap: 14px 8px;
+  min-height: 340px;
+  padding: 14px 10px 22px;
+  /* No border / background / inset shadow — keeps the field area visually
+     part of the table felt instead of a framed rectangle. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.month-stack {
+  position: relative;
+  min-height: 96px;
+  padding: 4px;
+  border-radius: 8px;
+  background: transparent;
+  border: 2px solid transparent;
+  overflow: visible;
+  /* Only transition colors — never transform — so the stack never physically moves */
+  transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+}
+
+/* `.has-hand-match` (any month for which the player has a matching card) is
+   tracked in the DOM but intentionally NOT styled — the rectangular outline
+   was too noisy. Hand match feedback now comes from the hover/click flow
+   alone (clicking a hand card opens the selection modal). */
+.month-stack.has-hand-match {
+  /* no visual cue */
+}
+
+.month-stack.selected-match-stack {
+  border-color: rgba(255, 216, 122, 0.95);
+  background: rgba(255, 216, 122, 0.14);
+  box-shadow: 0 0 0 3px rgba(255, 216, 122, 0.22), 0 0 18px var(--gold-glow);
+}
+
+/* Motion-stack is intentionally a no-op visually: the motion-card overlay
+   already conveys the action; flickering the stack background just adds noise. */
+.month-stack.motion-stack {
+  /* no visual change */
+}
+
+.month-stack.ppeok {
+  border-color: rgba(255, 82, 82, 0.55);
+  background: rgba(255, 82, 82, 0.08);
+}
+
+.month-stack-cards {
+  position: relative;
+  width: 64px;
+  height: 94px;
+}
+
+.month-stack-cards > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* When two or more cards share a month, fan them so adjacent cards overlap
+   by about half the card width (≈32px) — back card stays clearly visible. */
+.month-stack-cards > *:nth-child(2) {
+  transform: translate(30px, 6px) rotate(-3deg);
+  z-index: 2;
+}
+.month-stack-cards > *:nth-child(3) {
+  transform: translate(60px, 12px) rotate(4deg);
+  z-index: 3;
+}
+.month-stack-cards > *:nth-child(4) {
+  transform: translate(90px, 18px) rotate(-2deg);
+  z-index: 4;
+}
+
+/* ----- Cards ----- */
+
+.card-img,
+.bonus-card {
+  display: inline-flex;
+  width: 64px;
+  height: 94px;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.card-img {
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.card-img.small,
+.bonus-card.small {
+  width: 34px;
+  height: 50px;
+  border-radius: 4px;
+}
+
+.bonus-card {
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 2px solid var(--gold-bright);
+  background:
+    radial-gradient(ellipse at 50% 30%, #ffd17a 0%, #b81e2b 70%, #5a0d12 100%);
+  color: white;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.bonus-card b {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.bonus-card em {
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.18em;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+/* ----- Player hand ----- */
+
+.hand-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 4px 8px;
+  min-height: 110px;
+  overflow-x: auto;
+}
+
+.hand-card {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.hand-card.playable:hover {
+  transform: translateY(-12px);
+  filter: brightness(1.12);
+}
+
+.hand-card:disabled {
+  opacity: 0.66;
+  cursor: not-allowed;
+}
+
+.hand-card.matched.playable {
+  animation: idle-pulse 2400ms ease-in-out infinite;
+}
+
+.hand-card.bombable .card-img {
+  outline: 3px solid var(--bomb-red);
+  outline-offset: 1px;
+  animation: bomb-pulse 1600ms ease-in-out infinite;
+}
+
+.hand-card.matched .card-img,
+.hand-card.matched .bonus-card {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 1px;
+}
+
+.hand-card.selected {
+  transform: translateY(-18px);
+}
+
+.hand-card.selected .card-img,
+.hand-card.selected .bonus-card {
+  outline: 3px solid var(--gold-bright);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 5px rgba(255, 216, 122, 0.22),
+    0 12px 22px rgba(0, 0, 0, 0.55),
+    0 0 20px var(--gold-glow);
+}
+
+/* ----- Match selection / inline field choice ----- */
+
+.field-choice-inline {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.field-choice-inline:hover {
+  transform: translateY(-3px);
+}
+
+.field-choice-inline .card-img,
+.field-choice-inline .bonus-card {
+  outline: 3px solid var(--gold-bright);
+  outline-offset: 1px;
+  filter: brightness(1.1) saturate(1.1);
+  box-shadow: 0 0 14px var(--gold-glow);
+}
+
+.ghost-field-card {
+  display: inline-flex;
+  will-change: opacity, transform;
+}
+
+/* Phase 1 (land): ghost sits in its field slot, fully visible, no animation. */
+/* Phase 2 (capture): ghost flies with the motion-card to the pile. */
+
+.ghost-field-card.to-player.phase-capture {
+  animation: ghost-fly-to-player 640ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
+}
+
+.ghost-field-card.to-cpu.phase-capture {
+  animation: ghost-fly-to-cpu 640ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
+}
+
+@keyframes ghost-fly-to-player {
+  0%   { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translateY(48vh) rotate(-4deg) scale(0.25); }
+}
+
+@keyframes ghost-fly-to-cpu {
+  0%   { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-48vh) rotate(4deg) scale(0.25); }
+}
+
+.field-choice-inline span {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--gold-bright);
+  color: #1a0e07;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+
+/* ----- Badges on hand cards ----- */
+
+.bomb-badge,
+.match-badge {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.bomb-badge {
+  bottom: -6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bomb-red);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.match-badge {
+  top: -10px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--gold-bright);
+  color: #1a0e07;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+
+/* ----- Motion layer (animations) ----- */
+
+.motion-card {
+  display: inline-flex;
+  position: absolute;
+  z-index: 2;
+  transform-origin: center center;
+  animation-delay: calc(var(--i) * 55ms);
+  animation-fill-mode: both;
+  /* Aligned with the first grid card position inside .month-stack. The
+     landing transform applies a slight offset + tilt per card type for a
+     natural "tossed onto the field" feel (set below per .played/.drawn). */
+  left: calc(4px + var(--i) * 22px);
+  top: 4px;
+  --land-tilt: 0deg;
+  --land-x: 0px;
+  --land-y: 0px;
+}
+
+.motion-card.played {
+  --land-tilt: -7deg;
+  --land-x: 20px;
+  --land-y: 6px;
+}
+
+.motion-card.drawn,
+.motion-card.refill {
+  --land-tilt: 8deg;
+  --land-x: 16px;
+  --land-y: 12px;
+}
+
+.motion-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Dedicated motion layer for bonus cards. Centered over the field area so
+   a bonus drawn from the deck visually lands on the field before flying to
+   the captured pile. */
+.bonus-motion-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 94px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.motion-card.played {
+  animation-name: hand-to-field;
+  animation-duration: 620ms;
+  animation-timing-function: ease-out;
+}
+
+.motion-card.played.from-player {
+  animation-name: hand-to-field-from-player;
+}
+
+.motion-card.played.from-cpu {
+  animation-name: hand-to-field-from-cpu;
+}
+
+.motion-card.drawn,
+.motion-card.refill {
+  animation-name: deck-to-field;
+  animation-duration: 620ms;
+  animation-timing-function: ease-out;
+}
+
+/* Phase 1 (land): card flies from hand/deck and lands at its field slot. Uses
+   the default played/drawn animation above, so no explicit phase-land rule
+   needed — the card lands and `animation-fill-mode: both` holds it in place. */
+
+/* Phase 2 (capture): the landed card flies from the field slot to the
+   capturing player's pile. */
+.motion-card.captured.to-player.phase-capture {
+  animation-name: field-to-player-pile;
+  animation-duration: 640ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1);
+}
+
+.motion-card.captured.to-cpu.phase-capture {
+  animation-name: field-to-cpu-pile;
+  animation-duration: 640ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1);
+}
+
+/* Phase "landed": card has finished landing and is waiting at its field slot
+   for the batch capture phase. No animation — just sits at the tilted /
+   offset landing position via the --land-* variables. */
+.motion-card.captured.phase-landed {
+  animation: none;
+  transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1);
+}
+
+.motion-card.matchCheck {
+  animation-name: card-match;
+  animation-duration: 560ms;
+  animation-timing-function: ease;
+}
+
+.motion-card.capture,
+.motion-card.stealPi {
+  animation-name: field-to-capture;
+  animation-duration: 680ms;
+  animation-timing-function: ease-in;
+}
+
+.motion-card.bomb {
+  animation-name: bomb-flash;
+  animation-duration: 640ms;
+  animation-timing-function: ease;
+}
+
+/* ----- Action bar (shake) ----- */
+
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 216, 122, 0.18), rgba(200, 162, 75, 0.06));
+  border: 1px solid rgba(255, 216, 122, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.action-bar strong {
+  color: var(--gold-bright);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.shake-options,
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ----- Buttons ----- */
+
+.primary,
+.danger,
+.ghost,
+.choice-card {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: transform 80ms ease, filter 80ms ease;
+}
+
+.primary:hover,
+.danger:hover,
+.ghost:hover {
+  filter: brightness(1.1);
+}
+
+.primary:active,
+.danger:active,
+.ghost:active {
+  transform: translateY(1px);
+}
+
+.primary {
+  background: linear-gradient(180deg, #2aaf67, #16703f);
+  border-color: #1f8a51;
+  color: white;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.danger {
+  background: linear-gradient(180deg, #e84141, #962323);
+  border-color: #c12626;
+}
+
+.ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-dim);
+}
+
+.choice-card {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* ----- Modals ----- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+}
+
+.modal {
+  width: min(460px, 100%);
+  padding: 22px 22px 20px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 216, 122, 0.16) 0%, transparent 60%),
+    linear-gradient(180deg, #103821 0%, #07200f 100%);
+  border: 1px solid var(--gold-soft);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  color: var(--gold-bright);
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.modal p {
+  color: var(--text-dim);
+  margin: 6px 0;
+}
+
+.modal-cards {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.modal-actions {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.modal-actions .primary {
+  min-width: 80px;
+}
+
+/* ----- Match prompt (2-match capture selection) ----- */
+
+.match-prompt-modal {
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.match-prompt-help {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  margin: 4px 0 14px;
+}
+
+.match-prompt-help strong {
+  color: var(--gold-bright);
+}
+
+.match-prompt-handcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 8px 0 18px;
+}
+
+.match-prompt-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+}
+
+.match-prompt-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-prompt-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.match-prompt-option {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(200, 162, 75, 0.45);
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.match-prompt-option:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold-bright);
+  background: rgba(200, 162, 75, 0.16);
+  box-shadow: 0 0 18px rgba(255, 216, 122, 0.3);
+}
+
+.match-prompt-option .card-img,
+.match-prompt-option .bonus-card {
+  width: 100px;
+  height: 146px;
+  border-radius: 7px;
+}
+
+.match-prompt-handcard .card-img,
+.match-prompt-handcard .bonus-card {
+  width: 84px;
+  height: 122px;
+  border-radius: 7px;
+}
+
+.match-prompt-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.match-prompt-info strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.match-prompt-type {
+  font-size: 11px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.match-prompt-type.gwang {
+  background: var(--gold-bright);
+  color: #1a0e07;
+  border-color: var(--gold-bright);
+}
+
+.match-prompt-type.yeol,
+.match-prompt-type.ssangpi {
+  background: rgba(92, 217, 255, 0.18);
+  color: #5cd9ff;
+  border-color: rgba(92, 217, 255, 0.55);
+}
+
+.match-prompt-type.tti {
+  background: rgba(255, 165, 92, 0.18);
+  color: #ffa55c;
+  border-color: rgba(255, 165, 92, 0.55);
+}
+
+.match-prompt-tag {
+  font-size: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 82, 82, 0.18);
+  color: #ff8a8a;
+  border: 1px solid rgba(255, 82, 82, 0.5);
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .match-prompt-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ----- Start menu ----- */
+
+.start-menu {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 100vh;        /* fallback */
+  min-height: 100dvh;
+  gap: 24px;
+  /* Respect notch/status-bar inset on phones. */
+  padding:
+    max(60px, calc(env(safe-area-inset-top) + 36px))
+    max(20px, env(safe-area-inset-right))
+    max(60px, calc(env(safe-area-inset-bottom) + 36px))
+    max(20px, env(safe-area-inset-left));
+  text-align: center;
+}
+
+.start-title {
+  font-size: 64px;
+  margin: 0;
+  letter-spacing: 0.18em;
+  color: var(--gold-bright);
+  text-shadow: 0 4px 24px rgba(255, 216, 122, 0.4);
+}
+
+.start-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 0.18em;
+  margin: 0 0 16px;
+  text-transform: uppercase;
+}
+
+.start-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(280px, 100%);
+}
+
+.start-button {
+  font-size: 17px;
+  padding: 14px 24px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.rules-screen {
+  align-content: start;
+  padding:
+    max(60px, calc(env(safe-area-inset-top) + 36px))
+    max(20px, env(safe-area-inset-right))
+    max(40px, calc(env(safe-area-inset-bottom) + 24px))
+    max(20px, env(safe-area-inset-left));
+}
+
+.rules-content {
+  max-width: 680px;
+  width: 100%;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  color: var(--text-main);
+  text-align: left;
+  line-height: 1.7;
+}
+
+.rules-content h3 {
+  color: var(--gold-bright);
+  margin: 22px 0 8px;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+
+.rules-content h3:first-child {
+  margin-top: 0;
+}
+
+.rules-content p,
+.rules-content li {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.rules-content ul {
+  padding-left: 20px;
+  margin: 6px 0 12px;
+}
+
+.rules-content strong {
+  color: var(--gold-bright);
+}
+
+/* ----- Bank display ----- */
+
+.bank-display {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(300px, 100%);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.bank-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
+.bank-row strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-row small {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.bank-row small.gain {
+  background: rgba(46, 204, 113, 0.2);
+  color: #6ee7a1;
+  border: 1px solid rgba(46, 204, 113, 0.5);
+}
+
+.bank-row small.loss {
+  background: rgba(255, 82, 82, 0.18);
+  color: #ff7676;
+  border: 1px solid rgba(255, 82, 82, 0.5);
+}
+
+.bank-label {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--gold-bright);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(200, 162, 75, 0.16);
+  border: 1px solid rgba(200, 162, 75, 0.45);
+  vertical-align: middle;
+}
+
+.round-end-bank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px auto 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.start-button-mini {
+  font-size: 11px;
+  padding: 6px 14px;
+  letter-spacing: 0.08em;
+  border-radius: 8px;
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+/* ----- Dealing animation (in-place into the main game UI) ----- */
+
+.game-screen.dealing {
+  pointer-events: none;
+}
+
+/* Cards animate FROM the deck (middle of screen) TO their natural slots —
+   so the translate goes OUTSIDE the parent container's normal bounds. The
+   parent containers normally clip with overflow:hidden / overflow-x:auto;
+   we need to open them up during dealing so the cards stay visible. */
+.game-screen.dealing .hand-row,
+.game-screen.dealing .field-cards,
+.game-screen.dealing .month-stack,
+.game-screen.dealing .month-stack-cards {
+  overflow: visible !important;
+}
+
+/* Suppress decorative animations while dealing so they don't fight with the
+   per-card inline transition that flies cards in from the deck. */
+.game-screen.dealing .hand-card,
+.game-screen.dealing .hand-card.matched.playable,
+.game-screen.dealing .hand-card.bombable .card-img {
+  animation: none !important;
+}
+
+.game-screen.dealing .month-stack {
+  transition: none !important;
+}
+
+.game-screen.dealing .month-stack.has-hand-match,
+.game-screen.dealing .month-stack.selected-match-stack,
+.game-screen.dealing .month-stack.ppeok {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ----- Animations ----- */
+
+@keyframes hand-to-field {
+  from { opacity: 0; transform: translateY(40px) translateX(14px) rotate(8deg) scale(0.85); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  40% { opacity: 1; transform: translateY(0) translateX(0) rotate(calc(var(--land-tilt) * 0.6)) scale(1.1); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  55% { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(0.96); box-shadow: 0 0 24px 5px rgba(255, 216, 122, 0.65), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  70% { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1.03); box-shadow: 0 0 14px 3px rgba(255, 216, 122, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  to  { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+}
+
+/* Player plays: card flies UP from the player's hand area into the field. */
+@keyframes hand-to-field-from-player {
+  0%   { opacity: 0; transform: translate(0, 32vh) rotate(0) scale(0.7); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  18%  { opacity: 1; }
+  45%  { transform: translate(0, 0) rotate(calc(var(--land-tilt) * 0.6)) scale(1.08); }
+  60%  { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(0.97); box-shadow: 0 0 22px 5px rgba(255, 216, 122, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  75%  { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1.03); box-shadow: 0 0 12px 3px rgba(255, 216, 122, 0.3), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  100% { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+}
+
+/* CPU plays: card flies DOWN from the opponent's hand area into the field. */
+@keyframes hand-to-field-from-cpu {
+  0%   { opacity: 0; transform: translate(0, -28vh) rotate(0) scale(0.7); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  18%  { opacity: 1; }
+  45%  { transform: translate(0, 0) rotate(calc(var(--land-tilt) * 0.6)) scale(1.08); }
+  60%  { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(0.97); box-shadow: 0 0 22px 5px rgba(255, 216, 122, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  75%  { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1.03); box-shadow: 0 0 12px 3px rgba(255, 216, 122, 0.3), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  100% { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+}
+
+@keyframes deck-to-field {
+  from { opacity: 0; transform: translate(0, -180px) rotate(-5deg) scale(0.78); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  20%  { opacity: 1; }
+  45% { opacity: 1; transform: translateY(0) translateX(0) rotate(calc(var(--land-tilt) * 0.6)) scale(1.08); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  60% { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(0.97); box-shadow: 0 0 22px 5px rgba(255, 216, 122, 0.55), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  75% { transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1.03); box-shadow: 0 0 12px 3px rgba(255, 216, 122, 0.3), 0 4px 10px rgba(0, 0, 0, 0.5); }
+  to  { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); box-shadow: 0 0 0 0 rgba(255, 216, 122, 0), 0 4px 10px rgba(0, 0, 0, 0.5); }
+}
+
+@keyframes card-match {
+  0%   { transform: scale(0.96); }
+  45%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes field-to-capture {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  70%  { opacity: 1; transform: translateY(-12px) scale(1.04); }
+  100% { opacity: 0.2; transform: translateY(-54px) translateX(34px) rotate(-8deg) scale(0.78); }
+}
+
+@keyframes bomb-flash {
+  0%   { filter: brightness(1); transform: scale(0.96); }
+  45%  { filter: brightness(1.35); transform: scale(1.08); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+/* Phase 2 keyframes: card starts at field center (where Phase 1 left it),
+   then flies to the captured pile. Phase 1 keyframes end with rotate(0) so
+   the handoff is continuous. */
+
+@keyframes field-to-player-pile {
+  0%   { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--land-x), 48vh) rotate(-4deg) scale(0.25); }
+}
+
+@keyframes field-to-cpu-pile {
+  0%   { opacity: 1; transform: translate(var(--land-x), var(--land-y)) rotate(var(--land-tilt)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--land-x), -48vh) rotate(4deg) scale(0.25); }
+}
+
+@keyframes idle-pulse {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+@keyframes bomb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.3); }
+  50%      { box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.2); }
+}
+
+/* ----- Tablet / narrow desktop ----- */
+
+@media (max-width: 1024px) {
+  .table-zone {
+    grid-template-columns: 1fr;
+  }
+
+  .event-log,
+  .status-panel {
+    display: none;
+  }
+}
+
+/* ----- Mobile ----- */
+
+@media (max-width: 760px) {
+  .game-screen {
+    grid-template-rows: auto auto 1fr auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .opponent-zone {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .summary.cpu .summary-header .points {
+    font-size: 18px;
+  }
+
+  .table-zone {
+    grid-template-columns: 1fr;
+    padding: 10px;
+    min-height: 0;
+  }
+
+  .event-log,
+  .status-panel {
+    max-height: 110px;
+    overflow-y: auto;
+    padding: 8px 10px;
+  }
+
+  .event-log h2,
+  .status-panel h2 {
+    font-size: 11px;
+  }
+
+  .field-cards {
+    grid-template-columns: repeat(4, minmax(64px, 1fr));
+    grid-template-rows: repeat(3, minmax(86px, auto));
+    min-height: 280px;
+    gap: 10px 6px;
+    padding: 10px 4px 14px;
+  }
+
+  .month-stack {
+    min-height: 80px;
+  }
+
+  .month-stack.count-1 .month-stack-cards {
+    grid-template-columns: 54px;
+  }
+
+  .month-stack.count-2 .month-stack-cards,
+  .month-stack.count-3 .month-stack-cards,
+  .month-stack.count-4 .month-stack-cards {
+    grid-template-columns: repeat(2, 54px);
+  }
+
+  .card-img,
+  .bonus-card {
+    width: 54px;
+    height: 79px;
+  }
+
+  .card-img.small,
+  .bonus-card.small {
+    width: 28px;
+    height: 41px;
+  }
+
+  .score-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .captured-groups {
+    grid-template-columns: repeat(4, minmax(64px, 1fr));
+  }
+
+  .hand-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 10px 2px 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* =====================================================================
+   Mobile / phone tuning (iPhone, Android phone).
+   Triggered by narrow viewport OR coarse pointer (touchscreen).
+   ===================================================================== */
+@media (max-width: 480px), (pointer: coarse) and (max-width: 820px) {
+  /* Smaller chrome around the table so cards get more room. */
+  .game-screen {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+
+  /* Start screen — tighter title, comfortable tap targets. */
+  .start-title {
+    font-size: 44px;
+    letter-spacing: 0.14em;
+  }
+  .start-subtitle {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+  }
+  .start-button {
+    font-size: 17px;
+    padding: 16px 22px;     /* ≥ 44pt tap target on iOS */
+    min-height: 52px;
+  }
+  .start-buttons {
+    width: min(320px, 100%);
+  }
+  .start-menu {
+    gap: 18px;
+  }
+
+  /* Rules screen — make body text comfortably readable. */
+  .rules-content {
+    padding: 18px 18px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .rules-content h3 {
+    font-size: 14px;
+    margin-top: 16px;
+  }
+
+  /* Modal options bigger on touch. */
+  .match-prompt-option .card-img,
+  .match-prompt-option .bonus-card {
+    width: 96px;
+    height: 140px;
+  }
+
+  /* Prevent any horizontal page scroll. */
+  html, body {
+    overflow-x: hidden;
+  }
+
+  /* Toasts shouldn't be too wide on a 390px screen. */
+  .event-toast {
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* Landscape on small phones (e.g. iPhone in landscape, ~640×320).
+   Squish the top/bottom chrome so the field still fits. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .game-screen {
+    grid-template-rows: minmax(80px, auto) 1fr minmax(140px, auto);
+    gap: 4px;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+  .start-menu {
+    padding-top: 24px;
+    padding-bottom: 24px;
+    gap: 12px;
+  }
+  .start-title { font-size: 36px; }
+  .start-subtitle { margin-bottom: 8px; }
+  .card-img,
+  .bonus-card { width: 46px; height: 68px; }
+}

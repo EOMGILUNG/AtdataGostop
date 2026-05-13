@@ -1,0 +1,16 @@
+{
+  "name": "맞고",
+  "short_name": "맞고",
+  "description": "Korean Hwatu (Go-Stop) — 1 vs CPU",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f3d2e",
+  "theme_color": "#0f3d2e",
+  "icons": [
+    { "src": "cards/01.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "cards/01.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

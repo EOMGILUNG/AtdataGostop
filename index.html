@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f3d2e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="맞고" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./cards/01.png" />
+    <link rel="icon" href="./cards/01.png" />
+    <title>맞고</title>
+    <link rel="stylesheet" href="./src/styles.css?v=20260513-48" />
+  </head>
+  <body>
+    <main id="app" class="game-screen"></main>
+    <script>
+      // Local dev convenience: if someone double-clicks index.html, bounce to
+      // the dev server. On real hosts (http/https) this does nothing.
+      if (location.protocol === "file:") {
+        location.replace("http://localhost:4174/");
+      }
+    </script>
+    <script type="module" src="./src/main.js?v=20260513-48"></script>
+  </body>
+</html>
