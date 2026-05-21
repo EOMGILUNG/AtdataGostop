@@ -2240,15 +2240,21 @@ button {
   }
   .field-zone {
     padding: 0;
-    min-height: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* Lock a useful minimum height so iOS Safari's 100dvh quirks never
+       collapse the field. If the page total exceeds the viewport, the
+       game-screen's overflow:hidden clips the bottom instead — but the
+       field stays visible. */
+    min-height: 232px;
   }
   .field-cards {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: 100%;
+    /* No shrink (flex-shrink: 0) so the field-cards grid keeps its
+       intrinsic size regardless of how tall the parent flex column is.
+       grow:1 lets it expand on roomy phones. */
+    flex: 1 0 222px;
+    min-height: 222px;
     overflow: hidden;
   }
   /* Turn banner — small chip above the deck. It's nice context on desktop

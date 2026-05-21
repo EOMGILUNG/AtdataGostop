@@ -1,5 +1,5 @@
-import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-69";
-import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-69";
+import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-70";
+import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-70";
 
 console.log("%c맞고 UI v20260513-47", "color: #ffd87a; font-weight: 700; font-size: 14px;");
 
