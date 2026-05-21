@@ -1848,7 +1848,7 @@ button {
 
   /* Start screen — tighter title, comfortable tap targets. */
   .start-title {
-    font-size: 44px;
+    font-size: 36px;
     letter-spacing: 0.14em;
   }
   .start-subtitle {
@@ -1856,16 +1856,28 @@ button {
     letter-spacing: 0.14em;
   }
   .start-button {
-    font-size: 17px;
-    padding: 16px 22px;     /* ≥ 44pt tap target on iOS */
-    min-height: 52px;
+    font-size: 16px;
+    padding: 12px 18px;     /* still ≥ 44pt tap target */
+    min-height: 46px;
   }
   .start-buttons {
     width: min(320px, 100%);
   }
   .start-menu {
-    gap: 18px;
+    gap: 12px;
+    /* Push content up so iOS Safari's bottom toolbar (~80px overlay) never
+       hides the action buttons. Combine safe-area-inset-bottom with an
+       extra cushion for the toolbar that's NOT covered by env(). */
+    padding-bottom: max(96px, calc(env(safe-area-inset-bottom) + 80px)) !important;
+    padding-top: max(20px, env(safe-area-inset-top)) !important;
   }
+  .stats-display {
+    padding: 10px 12px;
+  }
+  .stats-grid { gap: 4px 10px; }
+  .stat-cell { padding: 4px 2px; }
+  .stat-cell span { font-size: 10px; }
+  .stat-cell strong { font-size: 12px; }
 
   /* Rules screen — make body text comfortably readable. */
   .rules-content {
@@ -2009,14 +2021,20 @@ button {
 /* Player's own captured pile slides up from the bottom — visually their
    captures come from below the field. CPU's pile slides down from the top
    for the same reason, so you can tell at a glance whose pile you're
-   looking at. */
+   looking at. We add a bottom cushion so iOS Safari's bottom toolbar
+   doesn't hide the lower portion of the player's pile. */
 .captured-view.player {
-  bottom: max(20px, env(safe-area-inset-bottom));
+  bottom: max(96px, calc(env(safe-area-inset-bottom) + 80px));
   animation: cvSlideUp 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 .captured-view.cpu {
-  top: max(20px, env(safe-area-inset-top));
+  top: max(60px, calc(env(safe-area-inset-top) + 40px));
   animation: cvSlideDown 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+/* Cap the overlay height so it fits inside the visible viewport even with
+   both Safari toolbars showing. */
+.captured-view {
+  max-height: min(60vh, 540px) !important;
 }
 @keyframes cvSlideUp {
   from { transform: translate(-50%, 24px); opacity: 0; }
