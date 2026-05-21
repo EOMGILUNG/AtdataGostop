@@ -1,7 +1,12 @@
-import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-70";
-import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-70";
+import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-71";
+import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-71";
 
-console.log("%c맞고 UI v20260513-47", "color: #ffd87a; font-weight: 700; font-size: 14px;");
+// Single source of truth for the visible build version. Bump this whenever
+// you bump the cache-bust query string in the imports above + index.html.
+// Rendered on the start menu so the user can see which version is live.
+const APP_VERSION = "v20260513-71";
+
+console.log("%c맞고 UI " + APP_VERSION, "color: #ffd87a; font-weight: 700; font-size: 14px;");
 
 const app = document.querySelector("#app");
 let state = null;
@@ -177,6 +182,7 @@ function showMenu() {
     <div class="start-menu">
       <h1 class="start-title">맞고</h1>
       <p class="start-subtitle">Korean Hwatu · 1 vs CPU</p>
+      <p class="start-version">${APP_VERSION}</p>
       ${bankCard()}
       ${statsCard()}
       <div class="start-buttons">
@@ -419,6 +425,14 @@ async function startGame() {
     return;
   }
   setMode("game");
+  // Show the visible version chip in the corner so we always know which
+  // build is running on the device.
+  const existingChip = document.getElementById("version-chip");
+  if (existingChip) existingChip.remove();
+  const chip = document.createElement("div");
+  chip.id = "version-chip";
+  chip.textContent = APP_VERSION;
+  document.body.appendChild(chip);
   // skipInitialBonus: leave bonus cards on the field so the user can SEE
   // them during dealing, then we'll capture them with animation afterwards.
   state = createGame({

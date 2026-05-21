@@ -1929,6 +1929,30 @@ button {
    client still has the older render.js loaded. */
 .match-badge { display: none !important; }
 
+/* Visible build version chip. Helps confirm which version is actually
+   loaded on a real device (in case of stale GitHub Pages cache, etc.). */
+.start-version {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--text-mute);
+  margin: -10px 0 4px;
+}
+#version-chip {
+  position: fixed;
+  top: max(6px, env(safe-area-inset-top));
+  right: max(6px, env(safe-area-inset-right));
+  z-index: 1000;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(200, 162, 75, 0.25);
+  border-radius: 8px;
+  padding: 2px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+}
+
 /* ----- Captured-pile overlay (잡은 카드 보기) -----
    A bottom-sheet style panel listing the chosen player's captured cards by
    category. Opens automatically for ~2s after each capture (auto class) or
