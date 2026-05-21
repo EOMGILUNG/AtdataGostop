@@ -1840,10 +1840,13 @@ button {
   /* Smaller chrome around the table so cards get more room. */
   .game-screen {
     padding-top: max(8px, env(safe-area-inset-top));
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    /* Bottom padding clears iOS Safari's URL toolbar (~80px overlay) so the
+       hand row never disappears behind it. Safe-area-inset-bottom only
+       covers the home indicator (~34px) — we need extra cushion. */
+    padding-bottom: max(86px, calc(env(safe-area-inset-bottom) + 70px)) !important;
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
-    gap: 6px;
+    gap: 4px;
   }
 
   /* Start screen — tighter title, comfortable tap targets. */
