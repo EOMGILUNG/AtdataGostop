@@ -2267,19 +2267,31 @@ button {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    /* Lock a useful minimum height so iOS Safari's 100dvh quirks never
-       collapse the field. If the page total exceeds the viewport, the
-       game-screen's overflow:hidden clips the bottom instead — but the
-       field stays visible. */
-    min-height: 232px;
+    /* Lock a useful minimum height. Use !important because something in the
+       cascade (or iOS Safari's flex behavior) keeps collapsing this. */
+    min-height: 254px !important;
+    flex-shrink: 0;
   }
   .field-cards {
-    /* No shrink (flex-shrink: 0) so the field-cards grid keeps its
-       intrinsic size regardless of how tall the parent flex column is.
-       grow:1 lets it expand on roomy phones. */
-    flex: 1 0 222px;
-    min-height: 222px;
+    /* HARD explicit height so the 3-row grid is guaranteed visible on every
+       device. We tried flex-shrink:0 + min-height but iOS Safari was still
+       collapsing the grid in some cases. !important seals it. */
+    height: 232px !important;
+    min-height: 232px !important;
+    flex-shrink: 0 !important;
     overflow: hidden;
+    position: relative;
+  }
+  /* Deck pile pinned at the absolute center of field-cards. Doesn't rely on
+     grid placement so it's always visible even if grid rows misbehave. */
+  .field-cards > .field-deck {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    grid-column: unset !important;
+    grid-row: unset !important;
+    z-index: 10 !important;
   }
   /* Turn banner — small chip above the deck. It's nice context on desktop
      but takes a row of precious vertical space on phones. Keep it visible

@@ -1,5 +1,5 @@
-import { createDeck } from "../data/cards.js?v=20260513-72";
-import { DEFAULT_RULES } from "../data/rules.js?v=20260513-72";
+import { createDeck } from "../data/cards.js?v=20260513-73";
+import { DEFAULT_RULES } from "../data/rules.js?v=20260513-73";
 
 export function shuffle(cards, random = Math.random) {
   const copy = cards.map((card) => ({ ...card, types: [...card.types], tags: [...card.tags] }));
