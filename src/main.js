@@ -1,5 +1,5 @@
-import { createGame } from "./engine/game.js?v=20260513-48";
-import { mountGame } from "./ui/render.js?v=20260513-48";
+import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-69";
+import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-69";
 
 console.log("%c맞고 UI v20260513-47", "color: #ffd87a; font-weight: 700; font-size: 14px;");
 
@@ -36,7 +36,79 @@ function saveMoney(value) {
 
 let money = loadMoney();
 
+// ----- Stats persistence (rounds, wins, streaks, etc.) -----
+
+const STATS_KEY = "gostop-stats-v1";
+
+const EMPTY_STATS = {
+  rounds: 0,
+  playerWins: 0,
+  cpuWins: 0,
+  nagari: 0,
+  highestRoundScore: 0,   // largest single-round final score the player took
+  biggestGain: 0,         // largest one-round increase to player's bank
+  biggestLoss: 0,         // largest one-round decrease to player's bank (positive number)
+  currentStreak: 0,       // consecutive player wins, negative for losses
+  bestStreak: 0,          // longest run of player wins
+  worstStreak: 0,         // longest run of player losses (stored positive)
+  firstPlayedAt: null,    // ISO date
+  lastPlayedAt: null,
+};
+
+function loadStats() {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return { ...EMPTY_STATS, ...parsed };
+      }
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return { ...EMPTY_STATS };
+}
+
+function saveStats(value) {
+  try {
+    localStorage.setItem(STATS_KEY, JSON.stringify(value));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+let stats = loadStats();
+
+function recordRoundStats(result) {
+  if (!result) return;
+  stats.rounds += 1;
+  const now = new Date().toISOString();
+  if (!stats.firstPlayedAt) stats.firstPlayedAt = now;
+  stats.lastPlayedAt = now;
+
+  if (result.type === "nagari") {
+    stats.nagari += 1;
+    stats.currentStreak = 0;
+  } else if (result.winner === "player") {
+    stats.playerWins += 1;
+    const score = result.final?.total ?? 0;
+    if (score > stats.highestRoundScore) stats.highestRoundScore = score;
+    if (score > stats.biggestGain) stats.biggestGain = score;
+    stats.currentStreak = stats.currentStreak >= 0 ? stats.currentStreak + 1 : 1;
+    if (stats.currentStreak > stats.bestStreak) stats.bestStreak = stats.currentStreak;
+  } else if (result.winner === "cpu") {
+    stats.cpuWins += 1;
+    const score = result.final?.total ?? 0;
+    if (score > stats.biggestLoss) stats.biggestLoss = score;
+    stats.currentStreak = stats.currentStreak <= 0 ? stats.currentStreak - 1 : -1;
+    if (-stats.currentStreak > stats.worstStreak) stats.worstStreak = -stats.currentStreak;
+  }
+  saveStats(stats);
+}
+
 function applyRoundResult(result) {
+  recordRoundStats(result);
   if (!result) return;
   if (result.type === "nagari") return; // no transfer, multiplier handled inside the engine
   const winner = result.winner;
@@ -65,6 +137,38 @@ function bankCard() {
   `;
 }
 
+function statsCard() {
+  if (!stats.rounds) {
+    return `
+      <div class="stats-display">
+        <div class="stats-empty">아직 플레이 기록이 없어 — 첫 라운드를 시작해봐!</div>
+      </div>
+    `;
+  }
+  const winRate = stats.rounds > 0
+    ? Math.round((stats.playerWins / stats.rounds) * 100)
+    : 0;
+  const streakLabel = stats.currentStreak > 0
+    ? `🔥 ${stats.currentStreak}연승`
+    : stats.currentStreak < 0
+      ? `💧 ${-stats.currentStreak}연패`
+      : "—";
+  return `
+    <div class="stats-display">
+      <div class="stats-title">누적 전적</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span>총 라운드</span><strong>${stats.rounds}판</strong></div>
+        <div class="stat-cell"><span>승 / 패 / 나가리</span><strong>${stats.playerWins} / ${stats.cpuWins} / ${stats.nagari}</strong></div>
+        <div class="stat-cell"><span>승률</span><strong>${winRate}%</strong></div>
+        <div class="stat-cell"><span>현재 흐름</span><strong>${streakLabel}</strong></div>
+        <div class="stat-cell"><span>최고 한 판 점수</span><strong>${stats.highestRoundScore}점</strong></div>
+        <div class="stat-cell"><span>한 판 최대 획득</span><strong>+${stats.biggestGain}점</strong></div>
+        <div class="stat-cell"><span>최장 연승 / 연패</span><strong>${stats.bestStreak} / ${stats.worstStreak}</strong></div>
+      </div>
+    </div>
+  `;
+}
+
 // ----- Screens -----
 
 function showMenu() {
@@ -74,21 +178,32 @@ function showMenu() {
       <h1 class="start-title">맞고</h1>
       <p class="start-subtitle">Korean Hwatu · 1 vs CPU</p>
       ${bankCard()}
+      ${statsCard()}
       <div class="start-buttons">
         <button class="primary start-button" data-action="start">게임 시작</button>
         <button class="ghost start-button" data-action="rules">게임 규칙</button>
         <button class="danger start-button" data-action="quit">게임 종료</button>
       </div>
-      <button class="ghost start-button-mini" data-action="reset-bank">자산 100점으로 초기화</button>
+      <div class="start-buttons-mini">
+        <button class="ghost start-button-mini" data-action="reset-bank">자산 초기화</button>
+        <button class="ghost start-button-mini" data-action="reset-stats">전적 초기화</button>
+      </div>
     </div>
   `;
   app.querySelector('[data-action="start"]').addEventListener("click", startGame);
   app.querySelector('[data-action="rules"]').addEventListener("click", showRules);
   app.querySelector('[data-action="quit"]').addEventListener("click", quitGame);
   app.querySelector('[data-action="reset-bank"]').addEventListener("click", () => {
-    if (confirm("자산을 100점으로 초기화할까?")) {
+    if (confirm("자산을 100점으로 초기화할까? (전적은 그대로 유지)")) {
       money = { player: STARTING_BANK, cpu: STARTING_BANK };
       saveMoney(money);
+      showMenu();
+    }
+  });
+  app.querySelector('[data-action="reset-stats"]').addEventListener("click", () => {
+    if (confirm("누적 전적을 모두 지울까? (자산은 그대로 유지)")) {
+      stats = { ...EMPTY_STATS };
+      saveStats(stats);
       showMenu();
     }
   });
@@ -225,6 +340,16 @@ async function runDealingAnimation() {
     return;
   }
 
+  // Deck count visual: at the start of dealing, every card that's about to
+  // be flown out of the deck still belongs to the "deck" visually. So bump
+  // the counter up by order.length now, then decrement it by 1 as each card
+  // launches its flight. By the end, the counter naturally lands at the
+  // engine's actual state.deck.length.
+  const deckCountEl = deckEl.querySelector("strong");
+  const initialDisplayCount = Number(deckCountEl?.textContent ?? state.deck.length);
+  let visualDeckCount = initialDisplayCount + order.length;
+  if (deckCountEl) deckCountEl.textContent = String(visualDeckCount);
+
   // Step 1: snap every card to the deck with no transition. This must happen
   // synchronously so the browser paints the "all at deck" state before we
   // start the per-card transitions.
@@ -249,6 +374,8 @@ async function runDealingAnimation() {
   await new Promise((resolve) => requestAnimationFrame(resolve));
 
   // Step 2: schedule each card's transition back to identity with a stagger.
+  // Also schedule a deck-count decrement at the exact moment each card
+  // begins its flight out of the deck.
   order.forEach((card, i) => {
     const delay = delays[i];
     card.style.transition =
@@ -256,6 +383,11 @@ async function runDealingAnimation() {
       ` opacity 220ms ease-out ${delay}ms`;
     card.style.transform = "translate(0px, 0px) scale(1)";
     card.style.opacity = "1";
+    window.setTimeout(() => {
+      if (!deckCountEl) return;
+      visualDeckCount -= 1;
+      deckCountEl.textContent = String(visualDeckCount);
+    }, delay);
   });
 
   const lastDelay = delays[delays.length - 1] ?? 0;
@@ -273,6 +405,10 @@ async function runDealingAnimation() {
 
 // ----- Game flow -----
 
+// Standard Gostop convention: the winner of the previous round goes first
+// next round. First round starts with player.
+let nextStartingPlayer = "player";
+
 async function startGame() {
   if (money.player <= 0) {
     showGameOver("패배…", "자산이 다 떨어졌어");
@@ -283,16 +419,30 @@ async function startGame() {
     return;
   }
   setMode("game");
-  state = createGame();
+  // skipInitialBonus: leave bonus cards on the field so the user can SEE
+  // them during dealing, then we'll capture them with animation afterwards.
+  state = createGame({
+    startingPlayer: nextStartingPlayer,
+    skipInitialBonus: true,
+  });
   state.bank = { ...money };
-  // Mount the game UI first so cards are in their final layout positions,
-  // then run the in-place dealing animation that flies them in from the deck.
   mountGame(app, state, () => {
-    applyRoundResult(state?.result);
+    const result = state?.result;
+    // Track who won so the next round starts with them.
+    if (result?.winner === "player") nextStartingPlayer = "player";
+    else if (result?.winner === "cpu") nextStartingPlayer = "cpu";
+    // (nagari: keep the previous starting player.)
+    applyRoundResult(result);
     if (state?.bank) state.bank = { ...money };
     startGame();
   });
   await runDealingAnimation();
+  // Now any bonus cards that came out in the deal are visible on the field.
+  // Capture them with animation (replacements flow in from deck).
+  if (state.field.some((c) => c.types?.includes("bonus"))) {
+    resolveInitialBonus(state);
+    await animateInitialBonus(state, app);
+  }
 }
 
 showMenu();

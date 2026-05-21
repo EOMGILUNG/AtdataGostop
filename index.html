@@ -16,10 +16,14 @@
     <link rel="apple-touch-icon" href="./cards/01.png" />
     <link rel="icon" href="./cards/01.png" />
     <title>맞고</title>
-    <link rel="stylesheet" href="./src/styles.css?v=20260513-48" />
+    <link rel="stylesheet" href="./src/styles.css?v=20260513-69" />
   </head>
   <body>
     <main id="app" class="game-screen"></main>
+    <!-- Persistent host for the captured-pile overlay. Lives outside #app
+         so it is NOT torn down on every render(), which would re-trigger
+         the slide-in animation and cause flicker during gameplay. -->
+    <div id="captured-view-root"></div>
     <script>
       // Local dev convenience: if someone double-clicks index.html, bounce to
       // the dev server. On real hosts (http/https) this does nothing.
@@ -27,6 +31,6 @@
         location.replace("http://localhost:4174/");
       }
     </script>
-    <script type="module" src="./src/main.js?v=20260513-48"></script>
+    <script type="module" src="./src/main.js?v=20260513-69"></script>
   </body>
 </html>

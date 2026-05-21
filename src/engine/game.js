@@ -1,5 +1,5 @@
-import { createDeck } from "../data/cards.js?v=20260513-48";
-import { DEFAULT_RULES } from "../data/rules.js?v=20260513-48";
+import { createDeck } from "../data/cards.js?v=20260513-69";
+import { DEFAULT_RULES } from "../data/rules.js?v=20260513-69";
 
 export function shuffle(cards, random = Math.random) {
   const copy = cards.map((card) => ({ ...card, types: [...card.types], tags: [...card.tags] }));
@@ -22,12 +22,13 @@ export function createGame(options = {}) {
   cpu.hand = deck.splice(0, 10);
   field.push(...deck.splice(0, 8));
 
+  const startingPlayer = options.startingPlayer === "cpu" ? "cpu" : "player";
   const state = {
-    phase: "playerTurn",
+    phase: `${startingPlayer}Turn`,
     deck,
     field,
     players: { player, cpu },
-    currentTurn: "player",
+    currentTurn: startingPlayer,
     pendingChoice: null,
     pendingGoStop: null,
     turnContext: null,
@@ -43,7 +44,15 @@ export function createGame(options = {}) {
     rules,
   };
 
-  handleStartingBonus(state);
+  // Initial-bonus handling is normally done synchronously inside createGame
+  // (any bonus card dealt to the field is captured immediately + replaced
+  // from the deck). When `skipInitialBonus` is true we leave the bonus on
+  // the field so the UI can show the dealing animation with the bonus
+  // visible, then run resolveInitialBonus() to animate it flying to the
+  // player's pile.
+  if (!options.skipInitialBonus) {
+    handleStartingBonus(state);
+  }
   const chongtong = detectChongtong(state);
   if (chongtong) {
     state.phase = "chongtongDecision";
@@ -55,7 +64,7 @@ export function createGame(options = {}) {
     };
     state.logs.unshift(`${label(chongtong.playerId)} 총통: ${chongtong.cards[0].monthName}`);
   } else {
-    beginTurn(state, "player");
+    beginTurn(state, startingPlayer);
   }
   return state;
 }
@@ -183,6 +192,40 @@ function handleStartingBonus(state) {
       state.field = state.field.filter((card) => !isBonus(card));
       for (const card of bonus) captureCards(state, "player", [card], { stealPi: true, reason: "시작 보너스" });
       while (state.field.length < 8 && state.deck.length > 0) state.field.push(state.deck.shift());
+      changed = true;
+    }
+  }
+}
+
+// Like handleStartingBonus, but records each bonus capture + replacement draw
+// as steps in state.lastActionSteps so the UI can replay them with
+// animations after the initial dealing. Call this when createGame was
+// invoked with skipInitialBonus: true.
+export function resolveInitialBonus(state) {
+  state.lastActionSteps = [];
+  state.deferredCaptures = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const bonus = state.field.filter(isBonus);
+    if (bonus.length > 0) {
+      // Snapshot bonus before removing it from the field.
+      for (const card of bonus) {
+        // The "initial-field" source tells the UI: this card is ALREADY on
+        // the field (placed by dealing); skip the Phase 1 deck→field flight
+        // and just do the Phase 2 field→player-pile flight.
+        recordStep(state, { type: "drawn", playerId: "player", source: "initial-field", card, month: card.month });
+      }
+      state.field = state.field.filter((card) => !isBonus(card));
+      for (const card of bonus) {
+        captureCards(state, "player", [card], { stealPi: true, reason: "시작 보너스" });
+        recordStep(state, { type: "event", name: "bonus", playerId: "player" });
+      }
+      while (state.field.length < 8 && state.deck.length > 0) {
+        const refill = state.deck.shift();
+        recordStep(state, { type: "drawn", playerId: "player", source: "deck", card: refill, month: refill.month });
+        state.field.push(refill);
+      }
       changed = true;
     }
   }

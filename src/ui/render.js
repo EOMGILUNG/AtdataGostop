@@ -1,4 +1,4 @@
-import { CARD_BACK } from "../data/cards.js?v=20260513-48";
+import { CARD_BACK } from "../data/cards.js?v=20260513-69";
 import {
   calculateScore,
   chooseGo,
@@ -10,12 +10,18 @@ import {
   playCard,
   runCpuTurn,
   skipShake,
-} from "../engine/game.js?v=20260513-48";
+} from "../engine/game.js?v=20260513-69";
 
 let matchPrompt = null;
 let bombPrompt = null;
 let selectedHandCardId = null;
 let activeStep = null;
+// Captured-pile overlay state. When non-null, an overlay sheet is rendered
+// showing the given player's captured cards. `auto` means it was opened by
+// a capture event (auto-dismiss after a timeout); manual opens stay until
+// the user closes them.
+let capturedView = null; // { playerId, auto }
+let capturedViewTimer = null;
 // Array of steps currently rendered with their phase ("land" | "landed" | "capture").
 // During the batch capture flow, multiple steps may be active simultaneously
 // (all landed, all flying to pile, etc.).
@@ -28,6 +34,15 @@ let isAnimating = false;
 // stack cards until their own motion-card animation finishes — otherwise the
 // drawn card "pre-appears" on the field during the played-step animation.
 let pendingAnimationCardIds = new Set();
+// IDs of cards the engine has already drawn out of the deck (state.deck.length
+// is already decremented) but whose Phase 1 fly-out animation has NOT yet
+// started. We add this count back to the deck display so the visual count
+// stays at "still in deck" until the card actually starts flying.
+let pendingDrawnIds = new Set();
+// The currently mounted game's update() — stored at module scope so helper
+// functions (animateInitialBonus, etc.) can trigger a re-render without
+// being passed the closure explicitly. mountGame sets this on every mount.
+let activeUpdate = null;
 
 const EVENT_LABELS = {
   jjok: "쪽!",
@@ -70,17 +85,31 @@ export function mountGame(app, state, setState) {
   activeStealStep = null;
   isAnimating = false;
   pendingAnimationCardIds = new Set();
+  pendingDrawnIds = new Set();
+  if (capturedViewTimer) { clearTimeout(capturedViewTimer); capturedViewTimer = null; }
+  capturedView = null;
+  // Reset the stable overlay host so stale content from a previous round
+  // doesn't reappear when this round starts.
+  const cvHost = document.getElementById("captured-view-root");
+  if (cvHost) { cvHost.innerHTML = ""; cvHost._lastHtml = ""; }
 
   const update = () => {
     render(app, state, setState, update);
+    // Pause CPU progression while the captured-pile overlay is open (auto or
+    // manual). When the overlay closes — either by its auto-dismiss timer or
+    // by the user tapping ✕ — closeCapturedView()/the auto timer call update()
+    // again, and we re-enter this function with capturedView == null,
+    // restarting the CPU turn naturally.
+    if (capturedView) return;
     if (!isAnimating && !state.roundOver && state.currentTurn === "cpu" && state.phase === "cpuTurn") {
       window.setTimeout(() => {
-        if (isAnimating || state.currentTurn !== "cpu" || state.phase !== "cpuTurn") return;
+        if (capturedView || isAnimating || state.currentTurn !== "cpu" || state.phase !== "cpuTurn") return;
         runCpuTurn(state);
         animateLatestAction(state, update);
       }, 700);
     }
   };
+  activeUpdate = update;
   update();
 }
 
@@ -94,13 +123,13 @@ function render(app, state, setState, update) {
       <aside class="event-log">${eventLog(state)}</aside>
       <section class="field-zone">
         ${turnBanner(state)}
-        <div class="deck-row">
-          <div class="deck-pile">
+        <div class="field-cards">
+          <div class="deck-pile field-deck" style="grid-column: 3; grid-row: 2;">
             ${cardBackMarkup("더미")}
-            <strong>${state.deck.length}</strong>
+            <strong>${displayedDeckCount(state)}</strong>
           </div>
+          ${fieldCards(state)}
         </div>
-        <div class="field-cards">${fieldCards(state)}</div>
         ${bonusMotionLayer()}
         ${eventToastLayer()}
       </section>
@@ -115,6 +144,45 @@ function render(app, state, setState, update) {
     ${stealFlightLayer()}
   `;
   bindEvents(app, state, setState, update);
+  // The captured-pile overlay lives in its OWN host so it isn't recreated
+  // on every render() — that would replay its slide-in animation on each
+  // game frame and look like a flicker.
+  renderCapturedViewHost(state, update);
+}
+
+// Stable separate host for the captured-pile overlay. Only updates when the
+// effective signature (playerId + auto flag + captured cards) actually
+// changes, so the slide-in animation plays exactly once per show.
+function renderCapturedViewHost(state, update) {
+  const host = document.getElementById("captured-view-root");
+  if (!host) return;
+  const html = capturedViewLayer(state);
+  if (host._lastHtml === html) return;   // no-op: same content already on screen
+  host._lastHtml = html;
+  host.innerHTML = html;
+  host.querySelectorAll("[data-close-captured]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCapturedView(update);
+    });
+  });
+}
+
+// The engine deals with the deck synchronously: when you play a card,
+// state.deck.length is already decreased by the time render() runs. To make
+// the on-screen "n장" counter visually decrement only when the drawn card
+// actually leaves the deck (Phase 1 land animation), we add back the number
+// of drawn steps that are still in flight.
+function displayedDeckCount(state) {
+  // Two buckets count as "visually still in the deck":
+  //   (1) drawn cards the engine already removed from the deck but whose
+  //       fly-out animation hasn't started yet → tracked in pendingDrawnIds
+  //   (2) drawn cards currently mid-flight (Phase 1 land) — they're leaving
+  //       the deck but haven't landed on the field yet
+  const inFlightLanding = activeSteps.filter(
+    (s) => s.type === "drawn" && s.phase === "land"
+  ).length;
+  return state.deck.length + pendingDrawnIds.size + inFlightLanding;
 }
 
 function inFlightCardIds() {
@@ -138,6 +206,97 @@ function inFlightCardIds() {
   return ids;
 }
 
+// --- Captured-pile overlay ---------------------------------------------
+//
+// showCapturedView(playerId, options): show the given player's captured-card
+// pile in a bottom-sheet overlay. If options.auto is true, the overlay
+// auto-dismisses after options.ms (default 2000). Manual opens stay until
+// the user taps the close button (or the backdrop).
+function showCapturedView(playerId, options = {}, update) {
+  if (capturedViewTimer) { clearTimeout(capturedViewTimer); capturedViewTimer = null; }
+  capturedView = { playerId, auto: !!options.auto };
+  if (options.auto) {
+    capturedViewTimer = setTimeout(() => {
+      capturedView = null;
+      capturedViewTimer = null;
+      if (typeof update === "function") update();
+    }, options.ms ?? 2000);
+  }
+  if (typeof update === "function") update();
+}
+
+function closeCapturedView(update) {
+  if (capturedViewTimer) { clearTimeout(capturedViewTimer); capturedViewTimer = null; }
+  capturedView = null;
+  if (typeof update === "function") update();
+}
+
+function capturedViewLayer(state) {
+  if (!capturedView) return "";
+  const playerId = capturedView.playerId;
+  const player = state.players[playerId];
+  if (!player) return "";
+  const captured = player.captured ?? [];
+  const score = player.score ?? calculateScore(captured, state.rules);
+  const name = playerId === "player" ? "나" : "상대";
+  const auto = capturedView.auto ? "auto" : "manual";
+
+  const groups = {
+    gwang: captured.filter((c) => c.types.includes("gwang")),
+    yeol:  captured.filter((c) => c.types.includes("yeol")),
+    tti:   captured.filter((c) => c.types.includes("tti")),
+    pi:    captured.filter((c) => c.types.includes("pi") || c.types.includes("ssangpi") || c.types.includes("bonus")),
+  };
+  const labelOf = { gwang: "광", yeol: "열끗", tti: "띠", pi: "피" };
+  const pointsOf = {
+    gwang: score.gwang, yeol: score.yeol, tti: score.tti, pi: score.pi,
+  };
+  const countOf = {
+    gwang: score.gwangCount, yeol: score.yeolCount, tti: score.ttiCount, pi: score.piCount,
+  };
+
+  const groupHtml = ["gwang", "yeol", "tti", "pi"].map((key) => {
+    const cards = groups[key];
+    const pts = pointsOf[key];
+    return `
+      <div class="captured-view-group ${cards.length ? "has-cards" : "empty"}">
+        <div class="captured-view-group-head">
+          <span class="cvg-label">${labelOf[key]}</span>
+          <span class="cvg-count">${countOf[key]}장</span>
+          ${pts > 0 ? `<span class="cvg-points">+${pts}점</span>` : ""}
+        </div>
+        <div class="captured-view-cards">
+          ${cards.length === 0
+            ? `<div class="captured-view-empty">—</div>`
+            : cards.map((c) => {
+                // Bonus cards (B01..B03) have no real PNG asset; render them
+                // with the same .bonus-card styling used elsewhere so they
+                // don't appear as blank slots in the modal.
+                if (c.types?.includes("bonus") || !c.image) {
+                  return `<span class="bonus-card captured-view-card" role="img" aria-label="${c.name}">${c.piValue ?? ""}피</span>`;
+                }
+                return `<span class="card-img captured-view-card" role="img" aria-label="${c.name}" style="background-image: url('${c.image}')"></span>`;
+              }).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="captured-view-backdrop ${auto}" data-close-captured></div>
+    <div class="captured-view ${auto} ${playerId}">
+      <div class="captured-view-head">
+        <strong>${name}가 잡은 카드</strong>
+        <span class="captured-view-score">${captured.length}장 · ${score.total}점</span>
+        <button class="captured-view-close" data-close-captured aria-label="닫기">✕</button>
+      </div>
+      <div class="captured-view-body">
+        ${groupHtml}
+      </div>
+    </div>
+  `;
+}
+
 function playerSummary(state, playerId) {
   const player = state.players[playerId];
   const inFlight = inFlightCardIds();
@@ -158,8 +317,18 @@ function playerSummary(state, playerId) {
   if (state.nagariMultiplier > 1) modifiers.push(`나가리 x${state.nagariMultiplier}`);
 
   const bank = state.bank?.[playerId];
+  // Short one-line summary for the mobile-portrait view (where score-metrics
+  // and captured-groups are hidden to save vertical space). Shown via CSS
+  // ::after content: attr(data-summary).
+  const phoneSummary = [
+    `잡 ${visibleCaptured.length}장`,
+    `광 ${score.gwangCount}`,
+    `띠 ${score.ttiCount}`,
+    `열 ${score.yeolCount}`,
+    `피 ${score.piCount}`,
+  ].join(" · ");
   return `
-    <div class="summary ${playerId}">
+    <div class="summary ${playerId}" data-summary="${phoneSummary}">
       <div class="summary-header">
         <div class="avatar">${avatarLabel}</div>
         <div>
@@ -171,6 +340,7 @@ function playerSummary(state, playerId) {
         </div>
         <div class="modifiers">
           ${modifiers.map((text) => `<span class="modifier-chip">${text}</span>`).join("")}
+          <button class="captured-view-btn" data-show-captured="${playerId}" aria-label="${name}가 잡은 카드 보기" title="잡은 카드 보기">🃏</button>
         </div>
       </div>
       <div class="score-progress ${reachedWin ? "full" : ""}"><span style="width: ${progress}%"></span></div>
@@ -370,8 +540,15 @@ function fieldCards(state) {
     .map(([monthKey, cards]) => {
       const isBonus = monthKey === "bonus";
       const monthNum = isBonus ? null : Number(monthKey);
-      const col = isBonus ? 1 : ((monthNum - 1) % 4) + 1;
-      const row = isBonus ? 4 : Math.floor((monthNum - 1) / 4) + 1;
+      // 5-column field grid: months still flow left→right in 4 cells per
+      // row, but we leave col 3 (the middle) reserved for the deck pile.
+      // So an original col of 1,2 stays as 1,2 and 3,4 shifts to 4,5.
+      const baseCol = isBonus ? 1 : ((monthNum - 1) % 4) + 1;
+      // Bonus cards on field (only at game start, before they're captured)
+      // park in the center column directly below the deck (row 3, col 3)
+      // — a visible spot that doesn't overlap any month slot.
+      const col = isBonus ? 3 : (baseCol >= 3 ? baseCol + 1 : baseCol);
+      const row = isBonus ? 3 : Math.floor((monthNum - 1) / 4) + 1;
       const stepsForMonth = steps.filter((s) => activeStepMonth(s) === monthNum);
       const classList = [
         "month-stack",
@@ -418,7 +595,7 @@ function playerHand(state) {
       return `
         <button class="hand-card ${canAct ? "playable" : ""} ${bomb ? "bombable" : ""} ${matchCount ? "matched" : ""} ${selectedHandCardId === card.id ? "selected" : ""}" data-card-id="${card.id}" ${canAct ? "" : "disabled"}>
           ${cardMarkup(card)}
-          ${matchCount ? `<span class="match-badge">${matchCount}장</span>` : ""}
+          ${matchCount ? `<span class="match-mark" aria-label="바닥에 같은 월 카드가 있음"></span>` : ""}
           ${bomb ? `<span class="bomb-badge" data-bomb-month="${bomb.month}">폭탄</span>` : ""}
         </button>
       `;
@@ -664,6 +841,18 @@ function bindEvents(app, state, setState, update) {
     update();
   });
   app.querySelector("[data-new-game]")?.addEventListener("click", () => setState());
+  app.querySelectorAll("[data-show-captured]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showCapturedView(btn.dataset.showCaptured, { auto: false }, update);
+    });
+  });
+  app.querySelectorAll("[data-close-captured]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCapturedView(update);
+    });
+  });
   app.querySelectorAll("[data-field-choice]").forEach((button) => {
     button.addEventListener("click", () => {
       playCard(state, matchPrompt.cardId, { fieldChoiceId: button.dataset.fieldChoice });
@@ -719,6 +908,50 @@ function cardTagLabels(card) {
     sakeCup: "국준",
   };
   return (card.tags ?? []).map((tag) => map[tag]).filter(Boolean);
+}
+
+// Animate the resolution of bonus cards that were dealt to the field at
+// game start. Called from main.js AFTER the dealing animation completes,
+// AFTER `resolveInitialBonus(state)` has updated the engine state.
+// Strategy: grab each bonus DOM element still on the rendered field, fly
+// it to the player's summary area with a scale-down + fade, then re-render
+// with the updated state (replacement cards already in state.field).
+export async function animateInitialBonus(state, app) {
+  const bonusEls = Array.from(app.querySelectorAll(".field-cards .bonus-card"));
+  if (bonusEls.length === 0) return;
+
+  const playerEl = app.querySelector(".player-zone .summary.player .avatar")
+    || app.querySelector(".player-zone");
+  if (!playerEl) return;
+
+  const targetRect = playerEl.getBoundingClientRect();
+  const targetCx = targetRect.left + targetRect.width / 2;
+  const targetCy = targetRect.top + targetRect.height / 2;
+
+  for (const el of bonusEls) {
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = Math.round(targetCx - cx);
+    const dy = Math.round(targetCy - cy);
+    el.style.transition = "transform 700ms cubic-bezier(0.4, 0, 0.2, 1), opacity 700ms ease-out";
+    el.style.transform = `translate(${dx}px, ${dy}px) scale(0.35) rotate(8deg)`;
+    el.style.opacity = "0.15";
+    el.style.zIndex = "30";
+  }
+  // Briefly show a "보너스!" toast.
+  activeEvent = { type: "event", name: "bonus", playerId: "player", key: `init-bonus-${Date.now()}` };
+  // Re-render just the toast layer doesn't exist here; force a re-render later.
+  await sleep(820);
+  activeEvent = null;
+
+  // Re-render — engine state already has bonus in captured + replacements
+  // on field. The new render replaces the bonus DOM (now offscreen due to
+  // our inline transform) with the post-resolution field. Old inline
+  // transforms vanish because the bonus DOM is no longer in the tree.
+  if (typeof activeUpdate === "function") activeUpdate();
+  // Tiny delay to let DOM update.
+  await sleep(60);
 }
 
 async function animateLatestAction(state, update) {
@@ -819,6 +1052,14 @@ async function animateLatestAction(state, update) {
     if (step.card?.id) pendingAnimationCardIds.add(step.card.id);
   }
 
+  // Pre-seed pendingDrawnIds with every drawn card from this action so the
+  // deck count stays at "pre-draw" until each card actually starts its
+  // fly-out. Each entry is removed when its Phase 1 land begins below.
+  pendingDrawnIds = new Set();
+  for (const step of allSteps) {
+    if (step.type === "drawn" && step.card?.id) pendingDrawnIds.add(step.card.id);
+  }
+
   isAnimating = true;
   let eventCounter = 0;
   const showEvent = async (evStep) => {
@@ -843,6 +1084,11 @@ async function animateLatestAction(state, update) {
   const landedCapturedSteps = [];
   for (const step of cardSteps) {
     const current = { ...step, phase: "land" };
+    // This drawn card is about to start its fly-out — remove it from
+    // pendingDrawnIds so the deck count drops by 1 at exactly this moment.
+    if (step.type === "drawn" && step.card?.id) {
+      pendingDrawnIds.delete(step.card.id);
+    }
     activeSteps = [
       ...landedCapturedSteps.map((s) => ({ ...s, phase: "landed" })),
       current,
@@ -860,9 +1106,11 @@ async function animateLatestAction(state, update) {
       landedCapturedSteps.push(step);
     } else {
       // Stays on field (no match, or self-resolved like bomb). Release it
-      // and play any inline post-steps tied to this card right away
-      // (event toast + steal-pi flight, in original order).
+      // (so fieldCards renders it as a static field card) AND remove it
+      // from activeSteps so its motion-card doesn't double-render on top
+      // of that static card during the subsequent post-step toasts.
       if (step.card?.id) pendingAnimationCardIds.delete(step.card.id);
+      activeSteps = landedCapturedSteps.map((s) => ({ ...s, phase: "landed" }));
       const posts = postsByCardId.get(step.card?.id) ?? [];
       for (const p of posts) await runPostStep(p);
     }
@@ -875,7 +1123,9 @@ async function animateLatestAction(state, update) {
     activeSteps = landedCapturedSteps.map((s) => ({ ...s, phase: "landed" }));
     activeStep = activeSteps[activeSteps.length - 1];
     update();
-    await sleep(700);
+    // Hold the landed-but-not-yet-flown cards on the field a bit longer so
+    // the user can see what just got captured before they fly away.
+    await sleep(1300);
 
     // Event toasts BEFORE the cards fly to the pile.
     for (const step of landedCapturedSteps) {
@@ -901,8 +1151,19 @@ async function animateLatestAction(state, update) {
   for (const p of orphanPosts) await runPostStep(p);
 
   pendingAnimationCardIds.clear();
+  pendingDrawnIds.clear();
   isAnimating = false;
-  update();
+
+  // After captures complete, auto-show the captured pile for the actor for
+  // ~2 seconds so the user sees what was just added. The actor is taken
+  // from the first capture step (since by now `state.currentTurn` may have
+  // already advanced to the other side).
+  const captureStep = (state.lastActionSteps ?? []).find((s) => s.type === "capture");
+  if (captureStep?.playerId && !state.roundOver) {
+    showCapturedView(captureStep.playerId, { auto: true, ms: 2000 }, update);
+  } else {
+    update();
+  }
 }
 
 function eventDuration(name) {

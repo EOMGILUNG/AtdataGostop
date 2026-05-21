@@ -731,10 +731,14 @@ button {
 
 .field-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 5-column grid: the center column (col 3) is the deck pile, with the
+     four month-stacks distributed in cols 1,2,4,5 of each row so they
+     fan around the deck. */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(102px, auto));
   justify-items: center;
-  align-content: start;
+  align-items: center;
+  align-content: center;
   gap: 14px 8px;
   min-height: 340px;
   padding: 14px 10px 22px;
@@ -744,6 +748,12 @@ button {
   border: 0;
   box-shadow: none;
   overflow: hidden;
+  position: relative;
+}
+
+.field-cards > .field-deck {
+  z-index: 5;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
 }
 
 .month-stack {
@@ -1772,7 +1782,7 @@ button {
   }
 
   .field-cards {
-    grid-template-columns: repeat(4, minmax(64px, 1fr));
+    grid-template-columns: repeat(5, minmax(54px, 1fr));
     grid-template-rows: repeat(3, minmax(86px, auto));
     min-height: 280px;
     gap: 10px 6px;
@@ -1883,6 +1893,502 @@ button {
   /* Toasts shouldn't be too wide on a 390px screen. */
   .event-toast {
     max-width: calc(100vw - 24px);
+  }
+}
+
+/* Match marker on a hand card — "the field has a matching same-month card
+   you can capture." A small red square in the TOP-LEFT corner pops against
+   both the white card background and the dark felt, much more legible than
+   the previous gold dot in the corner. */
+.match-mark {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #2b7cff;
+  box-shadow: 0 0 0 1.5px #fff, 0 0 6px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  z-index: 4;
+}
+/* When the player has 2 same-month cards in hand AND there's a field match,
+   stack a second square below to hint at "follow-up capture". */
+.match-mark.double::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 16px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: inherit;
+  box-shadow: inherit;
+}
+/* Hide any leftover old `.match-badge` text rendering in case a stale
+   client still has the older render.js loaded. */
+.match-badge { display: none !important; }
+
+/* ----- Captured-pile overlay (잡은 카드 보기) -----
+   A bottom-sheet style panel listing the chosen player's captured cards by
+   category. Opens automatically for ~2s after each capture (auto class) or
+   stays open until dismissed when the user taps the 🃏 button on a player
+   summary (manual class). */
+.captured-view-btn {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--panel-border);
+  color: var(--gold-bright);
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 4px;
+  padding: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.captured-view-btn:hover { background: rgba(0, 0, 0, 0.52); }
+.captured-view-btn:active { transform: scale(0.94); }
+
+.captured-view-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 220;
+  animation: cvFadeIn 160ms ease-out;
+}
+.captured-view-backdrop.auto {
+  background: rgba(0, 0, 0, 0.12);
+  pointer-events: none; /* don't block the game when auto-shown */
+}
+@keyframes cvFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.captured-view {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  max-height: min(72vh, 640px);
+  background: linear-gradient(180deg, rgba(8, 30, 18, 0.96), rgba(4, 22, 12, 0.98));
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  z-index: 221;
+  display: flex;
+  flex-direction: column;
+}
+/* Player's own captured pile slides up from the bottom — visually their
+   captures come from below the field. CPU's pile slides down from the top
+   for the same reason, so you can tell at a glance whose pile you're
+   looking at. */
+.captured-view.player {
+  bottom: max(20px, env(safe-area-inset-bottom));
+  animation: cvSlideUp 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.captured-view.cpu {
+  top: max(20px, env(safe-area-inset-top));
+  animation: cvSlideDown 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes cvSlideUp {
+  from { transform: translate(-50%, 24px); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
+@keyframes cvSlideDown {
+  from { transform: translate(-50%, -24px); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
+.captured-view.auto {
+  border-color: rgba(255, 216, 122, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 216, 122, 0.25), 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.captured-view-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(200, 162, 75, 0.18);
+}
+.captured-view-head strong {
+  font-size: 15px;
+  color: var(--gold-bright);
+  letter-spacing: 0.06em;
+}
+.captured-view-score {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.captured-view-close {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--panel-border);
+  color: var(--text-main);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.captured-view-close:hover { background: rgba(0, 0, 0, 0.55); }
+.captured-view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.captured-view-group {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(200, 162, 75, 0.18);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+.captured-view-group.empty { opacity: 0.55; }
+.captured-view-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.cvg-label  { font-weight: 700; font-size: 13px; color: var(--gold-bright); letter-spacing: 0.08em; }
+.cvg-count  { font-size: 12px; color: var(--text-dim); }
+.cvg-points { font-size: 12px; color: var(--gold-bright); margin-left: auto; }
+.captured-view-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 56px;
+}
+.captured-view-card {
+  width: 38px;
+  height: 58px;
+  border-radius: 4px;
+}
+.captured-view-empty {
+  font-size: 12px;
+  color: var(--text-mute);
+  padding: 12px 4px;
+}
+
+/* ----- Start-menu stats card (누적 전적) ----- */
+.stats-display {
+  width: min(360px, 100%);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: var(--text-main);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+}
+.stats-title {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--gold-bright);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.stats-empty {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 8px 4px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.stat-cell span {
+  font-size: 10.5px;
+  color: var(--text-mute);
+  letter-spacing: 0.08em;
+}
+.stat-cell strong {
+  font-size: 14px;
+  color: var(--text-main);
+  font-weight: 700;
+}
+.start-buttons-mini {
+  display: flex;
+  gap: 12px;
+}
+
+/* =====================================================================
+   iPhone-portrait compact layout. At ≤ 460px we strip out information-dense
+   panels (event log, status panel, big metric cards, yaku badges, captured
+   preview) so the field + hand can fill the screen. The thin summary strip
+   keeps avatar + name + bank chip + score on a single line.
+   ===================================================================== */
+@media (max-width: 460px) and (orientation: portrait) {
+  /* Lock the game to the viewport so the hand row never slips below the
+     fold. The middle row (table-zone) flex-shrinks to whatever is left
+     after the opponent strip and the hand. */
+  .game-screen {
+    grid-template-rows: minmax(80px, auto) 1fr minmax(200px, auto);
+    gap: 4px;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .table-zone { min-height: 0; }
+  .field-zone { min-height: 0; overflow: hidden; }
+
+  /* Clamp the opponent and player zones so they never visually leak into
+     their neighbors. Both leftover dealing-animation transforms and an
+     overflowed wrap of 11+ hand cards have shown up as "ghost" cards on
+     top of the summary; isolating + clipping the zones fixes both. */
+  .opponent-zone,
+  .player-zone {
+    overflow: hidden;
+    isolation: isolate;
+    position: relative;
+  }
+
+  /* Compact summary header — one line, no per-category metrics on phone. */
+  .summary {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .summary-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+  }
+  .summary .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+  }
+  .summary .name {
+    font-size: 13px;
+    line-height: 1.15;
+  }
+  .summary .bank-label {
+    font-size: 11px;
+    margin-left: 4px;
+  }
+  .summary .points {
+    font-size: 18px;
+    font-weight: 800;
+  }
+  .summary .threshold {
+    font-size: 11px;
+  }
+  .summary .modifiers {
+    flex-direction: row;
+    gap: 4px;
+  }
+  .summary .modifier-chip {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Hide the big info panels on phone portrait. They're informative on
+     desktop but they crowd the playfield on a 393px wide screen.
+     NOTE: the captured-preview block renders with class `.captured-groups`
+     (see render.js capturedPreview()). Both `score-metrics` and
+     `captured-groups` are stripped here so only the one-line summary header
+     remains. */
+  .summary .score-progress,
+  .summary .score-metrics,
+  .summary .yaku-row,
+  .summary .captured-preview,
+  .summary .captured-groups,
+  .event-log,
+  .status-panel {
+    display: none !important;
+  }
+
+  /* CPU hidden hand strip — sized small but clearly visible. No transform
+     scale because that visually shrinks the cards twice when combined with
+     explicit width/height. */
+  .opponent-zone .hidden-hand {
+    padding: 6px 0 4px;
+    height: auto;
+  }
+  .opponent-zone .hidden-hand .card-back {
+    width: 32px;
+    height: 48px;
+  }
+
+  /* Field area gets all remaining height. Clip aggressively so a row of
+     month-stack cards never spills below into the player-zone. */
+  .table-zone {
+    display: block;
+    padding: 0;
+    background: transparent;
+    border: none;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .field-zone {
+    padding: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .field-cards {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  /* Turn banner — small chip above the deck. It's nice context on desktop
+     but takes a row of precious vertical space on phones. Keep it visible
+     but compact so 3 field rows always fit. */
+  .turn-banner {
+    padding: 4px 10px;
+    font-size: 11px;
+    margin: 2px auto 0;
+  }
+  .deck-row {
+    gap: 8px;
+    margin: 2px 0 4px;
+  }
+  .deck-pile .card-back {
+    width: 44px;
+    height: 66px;
+  }
+  .deck-pile strong {
+    right: -6px;
+    bottom: -6px;
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .deck-row {
+    margin: 4px 6px;
+  }
+  .deck-pile {
+    width: 56px;
+    height: 82px;
+  }
+  .deck-pile strong {
+    font-size: 13px;
+  }
+
+  /* Field grid — 5 cols × 3 rows. The middle column (col 3) is reserved
+     for the deck pile so cards fan out around it. Months are now placed
+     in cols 1,2,4,5 of their row (see render.js fieldCards). */
+  .field-cards {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 3px 3px;
+    padding: 2px;
+    min-height: 0;
+    justify-items: center;
+    align-items: center;
+    position: relative;
+  }
+  /* Deck pile sits as a regular grid item dead-center. The drawn-from-deck
+     motion-cards therefore originate from this position and fan outward
+     to whichever month they belong to. */
+  .field-cards > .field-deck {
+    z-index: 5;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  }
+  /* Force-shrink the field cards so any row 3 cards stay inside the
+     allocated field area. Using !important to defeat the desktop rule's
+     equal specificity that arrives earlier in the cascade.
+     ALSO must shrink .month-stack-cards (the positioned container) since
+     its children are position:absolute — without this, each cell stays
+     at the desktop height of 94px regardless of the inner card size. */
+  .field-cards .card-img,
+  .field-cards .bonus-card {
+    width: 48px !important;
+    height: 72px !important;
+  }
+  .month-stack-cards {
+    width: 48px !important;
+    height: 72px !important;
+  }
+  /* Same-month overlap offsets need to scale down with the smaller card. */
+  .month-stack-cards > *:nth-child(2) { transform: translate(22px, 4px) rotate(-3deg); }
+  .month-stack-cards > *:nth-child(3) { transform: translate(44px, 8px) rotate(4deg); }
+  .month-stack-cards > *:nth-child(4) { transform: translate(66px, 12px) rotate(-2deg); }
+  .month-stack {
+    min-height: 0;
+  }
+  .month-stack-cards { gap: 0; }
+
+  /* Deck pile a touch smaller. */
+  .opponent-zone .hidden-hand {
+    height: 38px;
+  }
+  .opponent-zone .hidden-hand .card-back {
+    width: 28px;
+    height: 42px;
+  }
+
+  /* Player hand — 2 rows of 5 instead of a 10-wide horizontal scroller.
+     All 10 cards are visible at once and remain comfortably tappable.
+     Cards intentionally smaller than field cards so they don't dominate. */
+  .player-zone {
+    gap: 4px;
+  }
+  .hand-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+    padding: 2px 2px;
+    max-height: 184px;
+    overflow: hidden;       /* clip rather than leak above */
+  }
+  .hand-card .card-img,
+  .hand-card .bonus-card {
+    width: 54px;
+    height: 82px;
+  }
+  .hand-card { padding: 0; }
+  .hand-card .hand-card-badge { font-size: 10px; padding: 1px 4px; }
+
+  /* Show a short summary line under each player strip: captured count +
+     광/띠/열끗/피 quick chips. This brings back the score visibility we
+     stripped (since we hid score-metrics + captured-groups on phone). */
+  .summary::after {
+    content: attr(data-summary);
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+  /* Modal — wider on phone so the two card options fit comfortably. */
+  .match-prompt {
+    padding: 14px;
+    width: calc(100vw - 24px);
+    max-width: 360px;
+  }
+  .match-prompt-options {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .match-prompt-option .card-img,
+  .match-prompt-option .bonus-card {
+    width: 110px;
+    height: 168px;
   }
 }
 
