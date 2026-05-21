@@ -2316,13 +2316,16 @@ button {
 
   /* Field grid — 5 cols × 3 rows. The middle column (col 3) is reserved
      for the deck pile so cards fan out around it. Months are now placed
-     in cols 1,2,4,5 of their row (see render.js fieldCards). */
+     in cols 1,2,4,5 of their row (see render.js fieldCards).
+     IMPORTANT: do NOT set min-height: 0 here — that would override the
+     earlier `min-height: 222px` rule and let the grid collapse on phones
+     where the parent's auto-height is small. We need flex-basis 222px to
+     hold. */
   .field-cards {
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(3, minmax(0, 1fr));
     gap: 3px 3px;
     padding: 2px;
-    min-height: 0;
     justify-items: center;
     align-items: center;
     position: relative;
