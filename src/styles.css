@@ -2267,21 +2267,33 @@ button {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    /* Lock a useful minimum height. Use !important because something in the
-       cascade (or iOS Safari's flex behavior) keeps collapsing this. */
-    min-height: 254px !important;
+    min-height: 200px !important;
     flex-shrink: 0;
   }
   .field-cards {
-    /* HARD explicit height so the 3-row grid is guaranteed visible on every
-       device. We tried flex-shrink:0 + min-height but iOS Safari was still
-       collapsing the grid in some cases. !important seals it. */
-    height: 232px !important;
-    min-height: 232px !important;
+    /* Hard explicit height — keeps the 3-row grid visible. 184 = 3*60 + 2*2
+       gap + 2*1 padding ≈ enough room for tighter cards. Reduced from 232
+       because iPhone Safari's viewport leaves less middle-row space than we
+       budgeted, so we trim cards to match what's available. */
+    height: 184px !important;
+    min-height: 184px !important;
     flex-shrink: 0 !important;
     overflow: hidden;
     position: relative;
   }
+  /* Smaller hand cards too — gives the player-zone breathing room so the
+     middle (field) gets enough 1fr allocation. */
+  .hand-card .card-img,
+  .hand-card .bonus-card {
+    width: 48px !important;
+    height: 72px !important;
+  }
+  .hand-row { max-height: 166px; }
+  /* Compact summary so opponent/player zones don't eat all the viewport. */
+  .summary { padding: 4px 8px; }
+  .summary .avatar { width: 28px; height: 28px; font-size: 10px; }
+  .summary .name { font-size: 12px; }
+  .summary .points { font-size: 16px; }
   /* Deck pile pinned at the absolute center of field-cards. Doesn't rely on
      grid placement so it's always visible even if grid rows misbehave. */
   .field-cards > .field-deck {
@@ -2350,23 +2362,19 @@ button {
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
   }
   /* Force-shrink the field cards so any row 3 cards stay inside the
-     allocated field area. Using !important to defeat the desktop rule's
-     equal specificity that arrives earlier in the cascade.
-     ALSO must shrink .month-stack-cards (the positioned container) since
-     its children are position:absolute — without this, each cell stays
-     at the desktop height of 94px regardless of the inner card size. */
+     allocated field area (184px tall = 3 rows × ~60px). */
   .field-cards .card-img,
   .field-cards .bonus-card {
-    width: 48px !important;
-    height: 72px !important;
+    width: 40px !important;
+    height: 60px !important;
   }
   .month-stack-cards {
-    width: 48px !important;
-    height: 72px !important;
+    width: 40px !important;
+    height: 60px !important;
   }
-  /* Same-month overlap offsets need to scale down with the smaller card. */
-  .month-stack-cards > *:nth-child(2) { transform: translate(22px, 4px) rotate(-3deg); }
-  .month-stack-cards > *:nth-child(3) { transform: translate(44px, 8px) rotate(4deg); }
+  /* Same-month overlap offsets scale down with the smaller card. */
+  .month-stack-cards > *:nth-child(2) { transform: translate(18px, 4px) rotate(-3deg); }
+  .month-stack-cards > *:nth-child(3) { transform: translate(36px, 8px) rotate(4deg); }
   .month-stack-cards > *:nth-child(4) { transform: translate(66px, 12px) rotate(-2deg); }
   .month-stack {
     min-height: 0;
