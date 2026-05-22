@@ -1,4 +1,4 @@
-import { CARD_BACK } from "../data/cards.js?v=20260513-82";
+import { CARD_BACK } from "../data/cards.js?v=20260513-84";
 import {
   calculateScore,
   chooseGo,
@@ -10,7 +10,7 @@ import {
   playCard,
   runCpuTurn,
   skipShake,
-} from "../engine/game.js?v=20260513-82";
+} from "../engine/game.js?v=20260513-84";
 
 let matchPrompt = null;
 let bombPrompt = null;

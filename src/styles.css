@@ -1876,19 +1876,33 @@ button {
     /* Allow page to scroll if it ever overflows (rare with this sizing). */
     min-height: 100dvh;
   }
+  /* Bank-display (자산) — compact on mobile so the stats card + buttons
+     still fit below it. */
+  .bank-display {
+    padding: 8px 12px !important;
+    gap: 4px !important;
+  }
+  .bank-row { font-size: 11px !important; }
+  .bank-row strong { font-size: 16px !important; }
+  /* Stats-display (누적 전적) — radically smaller on mobile so 게임 시작
+     + 게임 그치 + 게임 종료 all fit on screen. */
   .stats-display {
-    padding: 6px 10px;
+    padding: 8px 10px !important;
   }
-  .stats-display h3 {
-    font-size: 12px !important;
-    margin: 0 0 4px !important;
+  .stats-title {
+    font-size: 10px !important;
+    margin-bottom: 4px !important;
+    letter-spacing: 0.12em !important;
   }
-  .stats-grid { gap: 2px 8px; }
-  .stat-cell { padding: 2px 2px; }
-  .stat-cell .label { font-size: 10px !important; }
-  .stat-cell .value { font-size: 13px !important; }
-  .stat-cell span { font-size: 10px; }
-  .stat-cell strong { font-size: 12px; }
+  .stats-grid {
+    gap: 2px 8px !important;
+  }
+  .stat-cell {
+    padding: 1px 0 !important;
+    gap: 0 !important;
+  }
+  .stat-cell span { font-size: 9px !important; letter-spacing: 0.04em !important; }
+  .stat-cell strong { font-size: 12px !important; }
 
   /* Rules screen — make body text comfortably readable. */
   .rules-content {
@@ -2199,9 +2213,15 @@ button {
     margin: 0;
   }
   .game-screen {
-    /* Three fixed-ish rows that always sum to less than the visible area:
-       opponent ~92px, field ~200px (1fr middle), player ~180px. */
-    grid-template-rows: minmax(86px, auto) minmax(190px, 1fr) minmax(176px, auto);
+    /* VH-relative card sizes so the layout adapts to viewport height.
+       iPhone 16 (660dvh) → ~62px field card. iPhone 14 Pro Max (~870dvh)
+       → ~82px. Clamped min/max so it never gets too small or too huge.
+       2:3 card aspect ratio is preserved via the calc(...) on width. */
+    --field-card-h: clamp(60px, 9.5vh, 86px);
+    --field-card-w: calc(var(--field-card-h) * 0.68);
+    --hand-card-h: clamp(54px, 8.4vh, 74px);
+    --hand-card-w: calc(var(--hand-card-h) * 0.68);
+    grid-template-rows: minmax(60px, auto) 1fr minmax(180px, auto);
     gap: 3px;
     height: 100vh;
     height: 100dvh;
@@ -2331,26 +2351,29 @@ button {
     min-height: 0;
   }
   .field-cards {
-    /* 3 rows × 62px card + 2×3 gap + 2×2 padding ≈ 196px. Force the grid
-       to use its parent's allocated height (the 1fr middle row). */
+    /* Take the FULL allocated height of the 1fr middle row, then center
+       3 card rows inside it (see align-content: center below). This is
+       what eliminates the empty void below the cards on tall phones. */
     flex: 1 1 auto;
-    min-height: 196px;
+    height: 100% !important;
+    min-height: 0;
     max-height: 100%;
     overflow: hidden;
     position: relative;
   }
-  /* Hand cards — 40×60 keeps 2 rows × 5 cards in a 120px hand row, leaving
-     more room for the field. Tap target slightly under iOS 44pt guideline
-     but still comfortable since cards are spaced. */
+  /* Hand cards — VH-relative size so larger phones get bigger cards. */
   .hand-card .card-img,
   .hand-card .bonus-card {
-    width: 40px !important;
-    height: 60px !important;
+    width: var(--hand-card-w) !important;
+    height: var(--hand-card-h) !important;
   }
+  /* Hand row height grows with the cards. */
   .hand-row {
-    max-height: 130px;
-    gap: 3px;
-    padding: 2px;
+    max-height: none !important;
+    height: auto !important;
+    gap: 4px !important;
+    padding: 2px !important;
+    overflow: visible !important;
   }
   /* Tighter player-zone summary so the hand row sits closer to it. */
   .player-zone {
@@ -2386,9 +2409,15 @@ button {
     gap: 8px;
     margin: 2px 0 4px;
   }
+  /* Deck pile mirrors field card sizing so it lives at the same scale as
+     the surrounding 12-month stacks. */
+  .deck-pile {
+    width: var(--field-card-w) !important;
+    height: var(--field-card-h) !important;
+  }
   .deck-pile .card-back {
-    width: 44px;
-    height: 66px;
+    width: 100% !important;
+    height: 100% !important;
   }
   .deck-pile strong {
     right: -6px;
@@ -2399,28 +2428,21 @@ button {
   .deck-row {
     margin: 4px 6px;
   }
-  .deck-pile {
-    width: 56px;
-    height: 82px;
-  }
-  .deck-pile strong {
-    font-size: 13px;
-  }
 
   /* Field grid — 5 cols × 3 rows. The middle column (col 3) is reserved
-     for the deck pile so cards fan out around it. Months are now placed
-     in cols 1,2,4,5 of their row (see render.js fieldCards).
-     IMPORTANT: do NOT set min-height: 0 here — that would override the
-     earlier `min-height: 222px` rule and let the grid collapse on phones
-     where the parent's auto-height is small. We need flex-basis 222px to
-     hold. */
+     for the deck pile so cards fan out around it. Months are placed in
+     cols 1,2,4,5 of their row (see render.js fieldCards). Rows are auto-
+     sized so the grid hugs its content; align-content: center vertically
+     centers all 3 rows in the available field-zone height so big phones
+     don't get a huge gap at the bottom. */
   .field-cards {
     grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(3, minmax(0, 1fr));
-    gap: 3px 3px;
+    grid-template-rows: repeat(3, auto);
+    gap: 6px 3px;
     padding: 2px;
     justify-items: center;
     align-items: center;
+    align-content: center;
     position: relative;
   }
   /* Deck pile sits as a regular grid item dead-center. The drawn-from-deck
@@ -2430,15 +2452,15 @@ button {
     z-index: 5;
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
   }
-  /* Field cards — 42x62, 3 rows fit in ~200px with gap. */
+  /* Field cards — VH-relative so they grow on Pro Max etc. */
   .field-cards .card-img,
   .field-cards .bonus-card {
-    width: 42px !important;
-    height: 62px !important;
+    width: var(--field-card-w) !important;
+    height: var(--field-card-h) !important;
   }
   .month-stack-cards {
-    width: 42px !important;
-    height: 62px !important;
+    width: var(--field-card-w) !important;
+    height: var(--field-card-h) !important;
   }
   .month-stack-cards > *:nth-child(2) { transform: translate(18px, 4px) rotate(-3deg); }
   .month-stack-cards > *:nth-child(3) { transform: translate(36px, 8px) rotate(4deg); }
