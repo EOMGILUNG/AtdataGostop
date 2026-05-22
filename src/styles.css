@@ -1837,15 +1837,13 @@ button {
    Triggered by narrow viewport OR coarse pointer (touchscreen).
    ===================================================================== */
 @media (max-width: 480px), (pointer: coarse) and (max-width: 820px) {
-  /* Smaller chrome around the table so cards get more room. */
+  /* Tight chrome — keep safe-area for notch/home indicator but no extra
+     cushion (the grid template rows above already budget the zones). */
   .game-screen {
-    padding-top: max(8px, env(safe-area-inset-top));
-    /* Bottom padding clears iOS Safari's URL toolbar (~80px overlay) so the
-       hand row never disappears behind it. Safe-area-inset-bottom only
-       covers the home indicator (~34px) — we need extra cushion. */
-    padding-bottom: max(86px, calc(env(safe-area-inset-bottom) + 70px)) !important;
-    padding-left: max(8px, env(safe-area-inset-left));
-    padding-right: max(8px, env(safe-area-inset-right));
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
     gap: 4px;
   }
 
@@ -2179,15 +2177,19 @@ button {
    keeps avatar + name + bank chip + score on a single line.
    ===================================================================== */
 @media (max-width: 460px) and (orientation: portrait) {
-  /* Lock the game to the viewport so the hand row never slips below the
-     fold. The middle row (table-zone) flex-shrinks to whatever is left
-     after the opponent strip and the hand. */
+  /* No-scroll layout: every zone is sized so the total fits within 100dvh
+     even with iOS Safari's bottom toolbar visible. */
+  html, body {
+    overflow: hidden !important;
+    height: 100%;
+  }
   .game-screen {
-    grid-template-rows: minmax(80px, auto) 1fr minmax(200px, auto);
+    /* Three fixed-ish rows that always sum to less than the visible area:
+       opponent ~110px, field ~200px (1fr middle), player ~210px. */
+    grid-template-rows: minmax(100px, auto) minmax(200px, 1fr) minmax(206px, auto);
     gap: 4px;
     height: 100vh;
     height: 100dvh;
-    min-height: 0;
     overflow: hidden;
   }
   .table-zone { min-height: 0; }
@@ -2288,28 +2290,25 @@ button {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    min-height: 200px !important;
-    flex-shrink: 0;
+    min-height: 0;
   }
   .field-cards {
-    /* Hard explicit height — keeps the 3-row grid visible. 184 = 3*60 + 2*2
-       gap + 2*1 padding ≈ enough room for tighter cards. Reduced from 232
-       because iPhone Safari's viewport leaves less middle-row space than we
-       budgeted, so we trim cards to match what's available. */
-    height: 184px !important;
-    min-height: 184px !important;
-    flex-shrink: 0 !important;
+    /* 3 rows × 62px card + 2×3 gap + 2×2 padding ≈ 196px. Force the grid
+       to use its parent's allocated height (the 1fr middle row). */
+    flex: 1 1 auto;
+    min-height: 196px;
+    max-height: 100%;
     overflow: hidden;
     position: relative;
   }
-  /* Smaller hand cards too — gives the player-zone breathing room so the
-     middle (field) gets enough 1fr allocation. */
+  /* Hand cards — 44x66 fits 2 rows × 5 cards in a 393px viewport with
+     comfortable tap targets (≥44pt per iOS HIG). Total hand row ~140px. */
   .hand-card .card-img,
   .hand-card .bonus-card {
-    width: 48px !important;
-    height: 72px !important;
+    width: 44px !important;
+    height: 66px !important;
   }
-  .hand-row { max-height: 166px; }
+  .hand-row { max-height: 144px; }
   /* Compact summary so opponent/player zones don't eat all the viewport. */
   .summary { padding: 4px 8px; }
   .summary .avatar { width: 28px; height: 28px; font-size: 10px; }
@@ -2382,18 +2381,16 @@ button {
     z-index: 5;
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
   }
-  /* Force-shrink the field cards so any row 3 cards stay inside the
-     allocated field area (184px tall = 3 rows × ~60px). */
+  /* Field cards — 42x62, 3 rows fit in ~200px with gap. */
   .field-cards .card-img,
   .field-cards .bonus-card {
-    width: 40px !important;
-    height: 60px !important;
+    width: 42px !important;
+    height: 62px !important;
   }
   .month-stack-cards {
-    width: 40px !important;
-    height: 60px !important;
+    width: 42px !important;
+    height: 62px !important;
   }
-  /* Same-month overlap offsets scale down with the smaller card. */
   .month-stack-cards > *:nth-child(2) { transform: translate(18px, 4px) rotate(-3deg); }
   .month-stack-cards > *:nth-child(3) { transform: translate(36px, 8px) rotate(4deg); }
   .month-stack-cards > *:nth-child(4) { transform: translate(66px, 12px) rotate(-2deg); }
