@@ -1,5 +1,5 @@
-import { createDeck } from "../data/cards.js?v=20260513-84";
-import { DEFAULT_RULES } from "../data/rules.js?v=20260513-84";
+import { createDeck } from "../data/cards.js?v=20260513-86";
+import { DEFAULT_RULES } from "../data/rules.js?v=20260513-86";
 
 export function shuffle(cards, random = Math.random) {
   const copy = cards.map((card) => ({ ...card, types: [...card.types], tags: [...card.tags] }));
@@ -76,6 +76,10 @@ function createPlayer(id) {
     captured: [],
     score: emptyScore(),
     goCount: 0,
+    // Score at the moment of the last 고 decision (or 0 if never gone). We
+    // only re-prompt go/stop when score.total strictly exceeds this value,
+    // so an unchanged-score turn after 고 does NOT show the modal again.
+    lastGoScore: 0,
     shakeCount: 0,
     shakenMonths: [],
     skippedShakeMonths: [],
@@ -204,6 +208,9 @@ function handleStartingBonus(state) {
 export function resolveInitialBonus(state) {
   state.lastActionSteps = [];
   state.deferredCaptures = [];
+  // The initial bonus belongs to the player who plays first this round
+  // (winner of previous round goes first; player goes first round 1).
+  const startingPlayer = state.currentTurn || "player";
   let changed = true;
   while (changed) {
     changed = false;
@@ -213,17 +220,17 @@ export function resolveInitialBonus(state) {
       for (const card of bonus) {
         // The "initial-field" source tells the UI: this card is ALREADY on
         // the field (placed by dealing); skip the Phase 1 deck→field flight
-        // and just do the Phase 2 field→player-pile flight.
-        recordStep(state, { type: "drawn", playerId: "player", source: "initial-field", card, month: card.month });
+        // and just do the Phase 2 field→starting-player-pile flight.
+        recordStep(state, { type: "drawn", playerId: startingPlayer, source: "initial-field", card, month: card.month });
       }
       state.field = state.field.filter((card) => !isBonus(card));
       for (const card of bonus) {
-        captureCards(state, "player", [card], { stealPi: true, reason: "시작 보너스" });
-        recordStep(state, { type: "event", name: "bonus", playerId: "player" });
+        captureCards(state, startingPlayer, [card], { stealPi: true, reason: "시작 보너스" });
+        recordStep(state, { type: "event", name: "bonus", playerId: startingPlayer });
       }
       while (state.field.length < 8 && state.deck.length > 0) {
         const refill = state.deck.shift();
-        recordStep(state, { type: "drawn", playerId: "player", source: "deck", card: refill, month: refill.month });
+        recordStep(state, { type: "drawn", playerId: startingPlayer, source: "deck", card: refill, month: refill.month });
         state.field.push(refill);
       }
       changed = true;
@@ -484,7 +491,27 @@ function afterTurn(state, playerId) {
   updateScores(state);
 
   const player = state.players[playerId];
-  if (player.score.total >= state.rules.winningScore) {
+  // Go/Stop only re-prompts when the score has STRICTLY INCREASED since the
+  // last 고 decision. Once the player has gone, holding at the same score
+  // doesn't ask them again — that was the bug where 고 after a turn with no
+  // capture popped the modal a second time.
+  const threshold = Math.max(state.rules.winningScore, (player.lastGoScore || 0) + 1);
+  if (player.score.total >= threshold) {
+    // If the actor has no cards left to play, "Go" is impossible — auto-stop
+    // the round and award them the win. Avoids the buggy go/stop modal
+    // showing up after the very last hand card.
+    const handLeft = (player.hand ?? []).filter((c) => !isBonus(c)).length;
+    if (handLeft === 0) {
+      updateScores(state);
+      state.roundOver = true;
+      state.winner = playerId;
+      state.phase = "roundEnd";
+      state.result = { type: "stop", winner: playerId, final: finalScore(state, playerId) };
+      state.logs.unshift(`${label(playerId)} 스톱 (마지막 패)`);
+      recordStep(state, { type: "event", name: "stop", playerId });
+      state.turnContext = null;
+      return;
+    }
     state.phase = playerId === "player" ? "goStopDecision" : "cpuTurn";
     state.pendingGoStop = { playerId };
     return;
@@ -504,6 +531,11 @@ export function chooseGo(state) {
   const playerId = state.pendingGoStop?.playerId;
   if (!playerId) return state;
   state.players[playerId].goCount += 1;
+  // Remember the score at this 고 — the next go/stop prompt only fires if
+  // score.total > lastGoScore. This is what suppresses repeat prompts when
+  // the player gains no points the next turn.
+  state.players[playerId].lastGoScore = state.players[playerId].score.total;
+  state.pendingGoStop = null;
   state.logs.unshift(`${label(playerId)} 고 ${state.players[playerId].goCount}`);
   state.turnContext = null;
   recordStep(state, { type: "event", name: "go", playerId });

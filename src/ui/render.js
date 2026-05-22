@@ -1,4 +1,4 @@
-import { CARD_BACK } from "../data/cards.js?v=20260513-84";
+import { CARD_BACK } from "../data/cards.js?v=20260513-86";
 import {
   calculateScore,
   chooseGo,
@@ -10,7 +10,7 @@ import {
   playCard,
   runCpuTurn,
   skipShake,
-} from "../engine/game.js?v=20260513-84";
+} from "../engine/game.js?v=20260513-86";
 
 let matchPrompt = null;
 let bombPrompt = null;
@@ -214,14 +214,16 @@ function inFlightCardIds() {
 // the user taps the close button (or the backdrop).
 function showCapturedView(playerId, options = {}, update) {
   if (capturedViewTimer) { clearTimeout(capturedViewTimer); capturedViewTimer = null; }
-  capturedView = { playerId, auto: !!options.auto };
-  if (options.auto) {
-    capturedViewTimer = setTimeout(() => {
-      capturedView = null;
-      capturedViewTimer = null;
-      if (typeof update === "function") update();
-    }, options.ms ?? 2000);
-  }
+  // Always auto-close — the user wants a quick peek, no X-tapping. Manual
+  // opens (via 🃏 button) get a longer 1.6s view; auto opens after a real
+  // capture get a quick 1.2s flash.
+  const isManual = options.auto === false;
+  capturedView = { playerId, auto: true };
+  capturedViewTimer = setTimeout(() => {
+    capturedView = null;
+    capturedViewTimer = null;
+    if (typeof update === "function") update();
+  }, options.ms ?? (isManual ? 1600 : 1200));
   if (typeof update === "function") update();
 }
 
@@ -1160,7 +1162,7 @@ async function animateLatestAction(state, update) {
   // already advanced to the other side).
   const captureStep = (state.lastActionSteps ?? []).find((s) => s.type === "capture");
   if (captureStep?.playerId && !state.roundOver) {
-    showCapturedView(captureStep.playerId, { auto: true, ms: 2000 }, update);
+    showCapturedView(captureStep.playerId, { auto: true, ms: 1200 }, update);
   } else {
     update();
   }
