@@ -1847,36 +1847,46 @@ button {
     gap: 4px;
   }
 
-  /* Start screen — tighter title, comfortable tap targets. */
+  /* Start screen — VERY compact so 게임 시작 + 통계 + 설명서 + 버전 chip
+     all fit in one Chrome/Safari viewport (which can be as small as ~440px
+     after the floating bottom toolbar overlay). */
   .start-title {
-    font-size: 36px;
-    letter-spacing: 0.14em;
+    font-size: 26px;
+    letter-spacing: 0.12em;
   }
   .start-subtitle {
-    font-size: 12px;
-    letter-spacing: 0.14em;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    margin: 0 0 4px !important;
   }
   .start-button {
-    font-size: 16px;
-    padding: 12px 18px;     /* still ≥ 44pt tap target */
-    min-height: 46px;
+    font-size: 14px;
+    padding: 9px 14px;
+    min-height: 38px;
   }
   .start-buttons {
-    width: min(320px, 100%);
+    width: min(280px, 100%);
+    gap: 8px;
   }
   .start-menu {
-    gap: 12px;
-    /* Push content up so iOS Safari's bottom toolbar (~80px overlay) never
-       hides the action buttons. Combine safe-area-inset-bottom with an
-       extra cushion for the toolbar that's NOT covered by env(). */
-    padding-bottom: max(96px, calc(env(safe-area-inset-bottom) + 80px)) !important;
-    padding-top: max(20px, env(safe-area-inset-top)) !important;
+    gap: 8px;
+    /* Just enough bottom padding to clear iOS toolbar — no more 96px. */
+    padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px)) !important;
+    padding-top: max(12px, env(safe-area-inset-top)) !important;
+    /* Allow page to scroll if it ever overflows (rare with this sizing). */
+    min-height: 100dvh;
   }
   .stats-display {
-    padding: 10px 12px;
+    padding: 6px 10px;
   }
-  .stats-grid { gap: 4px 10px; }
-  .stat-cell { padding: 4px 2px; }
+  .stats-display h3 {
+    font-size: 12px !important;
+    margin: 0 0 4px !important;
+  }
+  .stats-grid { gap: 2px 8px; }
+  .stat-cell { padding: 2px 2px; }
+  .stat-cell .label { font-size: 10px !important; }
+  .stat-cell .value { font-size: 13px !important; }
   .stat-cell span { font-size: 10px; }
   .stat-cell strong { font-size: 12px; }
 
@@ -2268,20 +2278,39 @@ button {
     display: none !important;
   }
 
-  /* CPU hidden hand strip — extra compact so opponent-zone doesn't waste
-     vertical space. */
+  /* Opponent zone — HORIZONTAL layout: summary on the left takes available
+     width, hidden hand stretches across the right. This kills the wasted
+     right-side space we had when summary stacked above the cards. */
   .opponent-zone {
+    display: grid !important;
+    grid-template-columns: minmax(120px, auto) 1fr !important;
+    align-items: center !important;
     padding: 4px 8px !important;
-    gap: 4px !important;
+    gap: 8px !important;
+  }
+  .opponent-zone .summary {
+    padding: 0 !important;
+    gap: 0 !important;
+    width: auto;
   }
   .opponent-zone .hidden-hand {
-    padding: 2px 0 0;
+    padding: 0;
     height: auto;
-    gap: 1px;
+    gap: 2px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    align-items: center;
   }
   .opponent-zone .hidden-hand .card-back {
-    width: 24px;
-    height: 36px;
+    width: 22px;
+    height: 34px;
+    flex: 0 0 auto;
+  }
+  /* Hide the data-summary "잡 0장 · 광 0 …" line on the opponent — points
+     already shown next to the name. Saves another ~16px. */
+  .opponent-zone .summary::after {
+    display: none !important;
   }
 
   /* Field area gets all remaining height. Clip aggressively so a row of

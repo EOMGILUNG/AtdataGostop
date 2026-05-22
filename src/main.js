@@ -1,10 +1,10 @@
-import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-81";
-import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-81";
+import { createGame, resolveInitialBonus } from "./engine/game.js?v=20260513-82";
+import { mountGame, animateInitialBonus } from "./ui/render.js?v=20260513-82";
 
 // Single source of truth for the visible build version. Bump this whenever
 // you bump the cache-bust query string in the imports above + index.html.
 // Rendered on the start menu so the user can see which version is live.
-const APP_VERSION = "v20260513-81";
+const APP_VERSION = "v20260513-82";
 
 console.log("%c맞고 UI " + APP_VERSION, "color: #ffd87a; font-weight: 700; font-size: 14px;");
 
