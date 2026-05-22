@@ -2177,11 +2177,16 @@ button {
    keeps avatar + name + bank chip + score on a single line.
    ===================================================================== */
 @media (max-width: 460px) and (orientation: portrait) {
-  /* No-scroll layout: every zone is sized so the total fits within 100dvh
-     even with iOS Safari's bottom toolbar visible. */
-  html, body {
-    overflow: hidden !important;
-    height: 100%;
+  /* Different scroll policy per screen:
+     - game-screen: locked to one viewport, no scroll (no-scroll rule)
+     - start-screen: content can be taller than viewport, body scrolls
+       so 게임 시작 button is reachable. */
+  html { height: 100%; }
+  body {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
   }
   .game-screen {
     /* Three fixed-ish rows that always sum to less than the visible area:
