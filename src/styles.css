@@ -2190,9 +2190,9 @@ button {
   }
   .game-screen {
     /* Three fixed-ish rows that always sum to less than the visible area:
-       opponent ~110px, field ~200px (1fr middle), player ~210px. */
-    grid-template-rows: minmax(100px, auto) minmax(200px, 1fr) minmax(206px, auto);
-    gap: 4px;
+       opponent ~92px, field ~200px (1fr middle), player ~180px. */
+    grid-template-rows: minmax(86px, auto) minmax(190px, 1fr) minmax(176px, auto);
+    gap: 3px;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -2268,16 +2268,20 @@ button {
     display: none !important;
   }
 
-  /* CPU hidden hand strip — sized small but clearly visible. No transform
-     scale because that visually shrinks the cards twice when combined with
-     explicit width/height. */
+  /* CPU hidden hand strip — extra compact so opponent-zone doesn't waste
+     vertical space. */
+  .opponent-zone {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+  }
   .opponent-zone .hidden-hand {
-    padding: 6px 0 4px;
+    padding: 2px 0 0;
     height: auto;
+    gap: 1px;
   }
   .opponent-zone .hidden-hand .card-back {
-    width: 32px;
-    height: 48px;
+    width: 24px;
+    height: 36px;
   }
 
   /* Field area gets all remaining height. Clip aggressively so a row of
@@ -2306,14 +2310,25 @@ button {
     overflow: hidden;
     position: relative;
   }
-  /* Hand cards — 44x66 fits 2 rows × 5 cards in a 393px viewport with
-     comfortable tap targets (≥44pt per iOS HIG). Total hand row ~140px. */
+  /* Hand cards — 40×60 keeps 2 rows × 5 cards in a 120px hand row, leaving
+     more room for the field. Tap target slightly under iOS 44pt guideline
+     but still comfortable since cards are spaced. */
   .hand-card .card-img,
   .hand-card .bonus-card {
-    width: 44px !important;
-    height: 66px !important;
+    width: 40px !important;
+    height: 60px !important;
   }
-  .hand-row { max-height: 144px; }
+  .hand-row {
+    max-height: 130px;
+    gap: 3px;
+    padding: 2px;
+  }
+  /* Tighter player-zone summary so the hand row sits closer to it. */
+  .player-zone {
+    padding: 4px 8px !important;
+    gap: 2px !important;
+  }
+  .player-zone .summary { padding: 2px 6px; }
   /* Compact summary so opponent/player zones don't eat all the viewport. */
   .summary { padding: 4px 8px; }
   .summary .avatar { width: 28px; height: 28px; font-size: 10px; }
@@ -2404,33 +2419,15 @@ button {
   }
   .month-stack-cards { gap: 0; }
 
-  /* Deck pile a touch smaller. */
-  .opponent-zone .hidden-hand {
-    height: 38px;
-  }
-  .opponent-zone .hidden-hand .card-back {
-    width: 28px;
-    height: 42px;
-  }
-
   /* Player hand — 2 rows of 5 instead of a 10-wide horizontal scroller.
      All 10 cards are visible at once and remain comfortably tappable.
-     Cards intentionally smaller than field cards so they don't dominate. */
-  .player-zone {
-    gap: 4px;
-  }
+     Final v=80 sizing: 40×60 cards in a 130px hand row.
+     IMPORTANT: do NOT re-introduce 54×82 or max-height 184px here —
+     they fight the compact sizing established above. */
   .hand-row {
     flex-wrap: wrap;
     justify-content: center;
-    gap: 3px;
-    padding: 2px 2px;
-    max-height: 184px;
     overflow: hidden;       /* clip rather than leak above */
-  }
-  .hand-card .card-img,
-  .hand-card .bonus-card {
-    width: 54px;
-    height: 82px;
   }
   .hand-card { padding: 0; }
   .hand-card .hand-card-badge { font-size: 10px; padding: 1px 4px; }
